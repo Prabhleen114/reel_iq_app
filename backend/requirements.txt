@@ -7,4 +7,6 @@ pydantic
 openai-whisper
 pytesseract
 groq
+python-dotenv
 requests
+instaloader

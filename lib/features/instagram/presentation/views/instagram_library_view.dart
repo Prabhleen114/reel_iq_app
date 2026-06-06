@@ -5,6 +5,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../viewmodels/instagram_viewmodel.dart';
 import '../../data/models/instagram_reel.dart';
+import '../../data/services/instagram_oauth_service.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class InstagramLibraryView extends StatefulWidget {
   const InstagramLibraryView({super.key});
@@ -22,15 +24,15 @@ class _InstagramLibraryViewState extends State<InstagramLibraryView> {
     });
   }
 
-  void _showMockOAuthDialog() {
+  void _showRealOAuthDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return _SimulatedOAuthDialog(
-          onSuccess: () async {
+        return _MetaOAuthDialog(
+          onCodeReceived: (code) async {
             final vm = Provider.of<InstagramViewModel>(this.context, listen: false);
-            await vm.connect();
+            await vm.connect(code);
           },
         );
       },
@@ -151,7 +153,7 @@ class _InstagramLibraryViewState extends State<InstagramLibraryView> {
           const SizedBox(height: 36),
 
           ElevatedButton.icon(
-            onPressed: igVM.isConnecting ? null : _showMockOAuthDialog,
+            onPressed: igVM.isConnecting ? null : _showRealOAuthDialog,
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFE1306C),
               foregroundColor: Colors.white,
@@ -431,29 +433,60 @@ class _ReelGridTile extends StatelessWidget {
   }
 }
 
-class _SimulatedOAuthDialog extends StatefulWidget {
-  final VoidCallback onSuccess;
+class _MetaOAuthDialog extends StatefulWidget {
+  final Function(String code) onCodeReceived;
 
-  const _SimulatedOAuthDialog({required this.onSuccess});
+  const _MetaOAuthDialog({required this.onCodeReceived});
 
   @override
-  State<_SimulatedOAuthDialog> createState() => _SimulatedOAuthDialogState();
+  State<_MetaOAuthDialog> createState() => _MetaOAuthDialogState();
 }
 
-class _SimulatedOAuthDialogState extends State<_SimulatedOAuthDialog> {
-  bool _isLoading = false;
+class _MetaOAuthDialogState extends State<_MetaOAuthDialog> {
+  late final WebViewController _controller;
 
-  void _authorize() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    await Future.delayed(const Duration(milliseconds: 1800));
-
-    if (mounted) {
-      Navigator.pop(context);
-      widget.onSuccess();
-    }
+  @override
+  void initState() {
+    super.initState();
+    final authorizeUrl = InstagramOAuthConfig.authorizeUrl;
+    debugPrint('--- WEBVIEW DEBUG ---');
+    debugPrint('Loading Initial URL: $authorizeUrl');
+    debugPrint('---------------------');
+    
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            debugPrint('WebView Intercepted URL: ${request.url}');
+            
+            if (request.url.startsWith(InstagramOAuthConfig.redirectUri)) {
+              debugPrint('Redirect URI Matched!');
+              final uri = Uri.parse(request.url);
+              
+              if (uri.queryParameters.containsKey('error')) {
+                debugPrint('OAuth Error: ${uri.queryParameters['error']}');
+                debugPrint('OAuth Error Reason: ${uri.queryParameters['error_reason']}');
+                debugPrint('OAuth Error Description: ${uri.queryParameters['error_description']}');
+              }
+              
+              final code = uri.queryParameters['code'];
+              if (code != null) {
+                // Ensure code doesn't have trailing #_
+                final cleanCode = code.replaceAll('#_', '');
+                debugPrint('OAuth Returned Code: $cleanCode');
+                Navigator.pop(context);
+                widget.onCodeReceived(cleanCode);
+                return NavigationDecision.prevent;
+              } else {
+                debugPrint('No code found in redirect URI.');
+              }
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(authorizeUrl));
   }
 
   @override
@@ -462,13 +495,13 @@ class _SimulatedOAuthDialogState extends State<_SimulatedOAuthDialog> {
       backgroundColor: const Color(0xFF1E1E24),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 450, maxHeight: 550),
+        constraints: const BoxConstraints(maxWidth: 450, maxHeight: 600),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Mock Webview Title Bar
+              // Dialog header
               Container(
                 color: const Color(0xFF2C2C35),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -478,11 +511,10 @@ class _SimulatedOAuthDialogState extends State<_SimulatedOAuthDialog> {
                     const SizedBox(width: 8),
                     const Expanded(
                       child: Text(
-                        'instagram.com/oauth/authorize...',
+                        'Secure Meta Login',
                         style: TextStyle(
                           color: AppTheme.textSecondary,
-                          fontSize: 12,
-                          overflow: TextOverflow.ellipsis,
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -495,137 +527,14 @@ class _SimulatedOAuthDialogState extends State<_SimulatedOAuthDialog> {
                   ],
                 ),
               ),
-
-              // Mock Webview Content
+              // Webview body
               Expanded(
-                child: _isLoading
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(color: Color(0xFFE1306C)),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Authenticating via Meta Secure...',
-                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Branding
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.camera_alt_rounded, color: Color(0xFFE1306C), size: 36),
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Instagram API',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 24),
-                            const Divider(color: Colors.white10),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'ReelIQ requests permissions to access:',
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            _buildPermissionRow(
-                              Icons.account_box_outlined,
-                              'Instagram Profile Information',
-                              'Access your account username, media count, and statistics.',
-                            ),
-                            const SizedBox(height: 16),
-                            _buildPermissionRow(
-                              Icons.video_collection_outlined,
-                              'Instagram Media Library',
-                              'Read your posts, reels, video tracks, and captions metadata.',
-                            ),
-                            const SizedBox(height: 16),
-                            _buildPermissionRow(
-                              Icons.insights_outlined,
-                              'Instagram Account Insights',
-                              'Read reach stats, view counts, likes, and comments analytics.',
-                            ),
-                            const SizedBox(height: 24),
-                            const Text(
-                              'You are logged in as tech_creator_iq.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
+                child: WebViewWidget(controller: _controller),
               ),
-
-              // Action buttons
-              if (!_isLoading)
-                Container(
-                  color: const Color(0xFF2C2C35),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
-                      ),
-                      const SizedBox(width: 16),
-                      ElevatedButton(
-                        onPressed: _authorize,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE1306C),
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text('Authorize'),
-                      ),
-                    ],
-                  ),
-                ),
             ],
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildPermissionRow(IconData icon, String title, String desc) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, color: AppTheme.accent, size: 20),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(color: AppTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                desc,
-                style: const TextStyle(color: AppTheme.textMuted, fontSize: 11, height: 1.4),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

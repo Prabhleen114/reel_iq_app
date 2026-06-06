@@ -3,7 +3,7 @@ import shutil
 import uuid
 import subprocess
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import cv2
@@ -11,6 +11,10 @@ import numpy as np
 import requests
 
 import glob
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Try to find Gyan.FFmpeg in WinGet packages on Windows dynamically
 winget_packages_dir = r"C:\Users\krary\AppData\Local\Microsoft\WinGet\Packages"
@@ -25,6 +29,7 @@ if os.path.exists(winget_packages_dir):
 
 # Import our AI Service
 from ai_service import AIService
+from instagram_service import InstagramService
 
 app = FastAPI(
     title="ReelIQ Video Analysis API",
@@ -58,8 +63,32 @@ async def health_check():
         "groq_configured": ai_service.client is not None
     }
 
+@app.get("/webhook")
+async def verify_webhook(
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token")
+):
+    """
+    Meta/Instagram Webhook Verification Endpoint
+    """
+    if hub_mode == "subscribe" and hub_verify_token == "reeliq_verify_123":
+        return Response(content=hub_challenge, media_type="text/plain")
+    else:
+        raise HTTPException(status_code=403, detail="Verification failed")
+
+@app.post("/webhook")
+async def receive_webhook(request: Request):
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+    print("WEBHOOK EVENT:", payload)
+    return {"status": "received"}
+
 # Initialize AI Service
 ai_service = AIService()
+instagram_service = InstagramService()
 
 # Dynamic Whisper Import Check
 try:
@@ -508,7 +537,7 @@ Return a JSON object with these exact keys:
 Return ONLY the JSON. No explanation."""
 
             completion = ai_service.client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.1-8b-instant",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=800,
@@ -557,6 +586,135 @@ Return ONLY the JSON. No explanation."""
         "trend": trend,
         "growth_prediction": f"Consistent daily posting + strong hook strategy could yield +15–20% reach growth over the next 30 days."
     }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INSTAGRAM ANALYSIS ENDPOINTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.get("/instagram/profile")
+async def get_instagram_profile(access_token: str):
+    try:
+        response = requests.get(
+            f"https://graph.instagram.com/me?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website&access_token={access_token}"
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch profile: {response.text}")
+        return response.json()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/instagram/media")
+async def get_instagram_media(access_token: str, limit: int = 25):
+    try:
+        response = requests.get(
+            f"https://graph.instagram.com/me/media?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count&limit={limit}&access_token={access_token}"
+        )
+        if response.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Failed to fetch media: {response.text}")
+        data = response.json()
+        items = data.get('data', [])
+        return [item for item in items if item.get('media_type') in ('VIDEO', 'REEL')]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AnalyzeProfileRequest(BaseModel):
+    profile_data: Dict[str, Any]
+    media_data: List[Dict[str, Any]]
+
+@app.post("/instagram/analyze-profile")
+async def analyze_instagram_profile(req: AnalyzeProfileRequest):
+    try:
+        stats = instagram_service.calculate_statistics(req.profile_data, req.media_data)
+        analysis = instagram_service.analyze_profile(req.profile_data, stats)
+        return {
+            "statistics": stats,
+            "aiAnalysis": analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class PublicProfileAnalysisRequest(BaseModel):
+    username: str
+
+@app.post("/instagram/public-profile-analysis")
+async def analyze_public_instagram_profile(req: PublicProfileAnalysisRequest):
+    try:
+        # Normalize username
+        username = req.username.strip().lstrip('@')
+        if not username:
+            raise HTTPException(status_code=400, detail="Username is required.")
+            
+        scraped_data = instagram_service.scrape_public_profile(username)
+        profile_data = scraped_data["profile_data"]
+        media_data = scraped_data["media_data"]
+        
+        stats = instagram_service.calculate_statistics(profile_data, media_data)
+        
+        try:
+            analysis = instagram_service.analyze_public_profile(profile_data, stats, username)
+        except ValueError as ve:
+            raise HTTPException(status_code=500, detail=str(ve))
+            
+        return {
+            "profileSnapshot": profile_data,
+            "statistics": stats,
+            "aiAnalysis": analysis
+        }
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ExchangeTokenRequest(BaseModel):
+    code: str
+    redirect_uri: str
+
+@app.post("/instagram/exchange-token")
+async def exchange_instagram_token(req: ExchangeTokenRequest):
+    app_id = os.getenv("META_APP_ID")
+    app_secret = os.getenv("META_APP_SECRET")
+    
+    if not app_id or not app_secret:
+        raise HTTPException(status_code=500, detail="META_APP_ID and META_APP_SECRET must be configured in backend.")
+
+    try:
+        # Step 1: Exchange code for short-lived token
+        resp1 = requests.post("https://api.instagram.com/oauth/access_token", data={
+            "client_id": app_id,
+            "client_secret": app_secret,
+            "grant_type": "authorization_code",
+            "redirect_uri": req.redirect_uri,
+            "code": req.code
+        })
+        
+        if resp1.status_code != 200:
+            raise HTTPException(status_code=400, detail=f"Failed to get short token: {resp1.text}")
+            
+        short_data = resp1.json()
+        short_token = short_data.get("access_token")
+        user_id = short_data.get("user_id", "")
+        
+        # Step 2: Exchange short token for long-lived token
+        resp2 = requests.get(f"https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_secret={app_secret}&access_token={short_token}")
+        
+        if resp2.status_code == 200:
+            long_data = resp2.json()
+            return {
+                "access_token": long_data.get("access_token"),
+                "token_type": long_data.get("token_type", "bearer"),
+                "expires_in": long_data.get("expires_in"),
+                "user_id": str(user_id)
+            }
+            
+        # Fallback to short token if long fails
+        return {
+            "access_token": short_token,
+            "token_type": "bearer",
+            "expires_in": None,
+            "user_id": str(user_id)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

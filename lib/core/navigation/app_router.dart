@@ -13,6 +13,9 @@ import '../../features/hook_testing/presentation/views/hook_testing_screen.dart'
 import '../../features/profile/presentation/views/profile_screen.dart';
 import '../../features/instagram/presentation/views/reel_inspector_screen.dart';
 import '../../features/instagram/presentation/views/creator_analysis_view.dart';
+import '../../features/instagram/presentation/views/instagram_profile_analysis_screen.dart';
+import '../../features/instagram/presentation/views/instagram_library_view.dart';
+import '../../features/instagram/presentation/views/instagram_username_analysis_screen.dart';
 import '../../features/onboarding/views/onboarding_screen.dart';
 import '../../features/reports/presentation/views/creator_report_screen.dart';
 
@@ -114,6 +117,24 @@ class AppRouter {
         builder: (BuildContext context, GoRouterState state) {
           final userId = state.pathParameters['userId'] ?? '';
           return CreatorReportScreen(userId: userId);
+        },
+      ),
+      GoRoute(
+        path: '/instagram-analysis',
+        builder: (BuildContext context, GoRouterState state) {
+          return const InstagramProfileAnalysisScreen();
+        },
+      ),
+      GoRoute(
+        path: '/instagram',
+        builder: (BuildContext context, GoRouterState state) {
+          return const InstagramLibraryView();
+        },
+      ),
+      GoRoute(
+        path: '/public-instagram-analysis',
+        builder: (BuildContext context, GoRouterState state) {
+          return const InstagramUsernameAnalysisScreen();
         },
       ),
     ],

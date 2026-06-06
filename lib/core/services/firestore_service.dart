@@ -167,7 +167,45 @@ class FirestoreService {
           .get();
       return doc.exists ? doc.data() : null;
     } catch (e) {
-      debugPrint('FirestoreService.getInstagramConnection error: $e');
+      debugPrint('FirestoreService.getInstagramConnection error. (Suppressed raw exception to prevent JS interop crash)');
+      throw Exception('Could not verify Instagram connection. Please check your network.');
+    }
+    return null;
+  }
+
+  // ─────────────────────────────────────────────
+  // INSTAGRAM ANALYSIS
+  // ─────────────────────────────────────────────
+
+  Future<void> saveInstagramAnalysis(String uid, Map<String, dynamic> analysis) async {
+    if (!_isLive) return;
+    try {
+      await _db
+          .collection('users')
+          .doc(uid)
+          .collection('instagram_analysis')
+          .add(analysis);
+    } catch (e) {
+      debugPrint('FirestoreService.saveInstagramAnalysis error. (Suppressed raw exception to prevent JS interop crash)');
+    }
+  }
+
+  Future<Map<String, dynamic>?> getLatestInstagramAnalysis(String uid) async {
+    if (!_isLive) return null;
+    try {
+      final snapshot = await _db
+          .collection('users')
+          .doc(uid)
+          .collection('instagram_analysis')
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+      if (snapshot.docs.isNotEmpty) {
+        return {...snapshot.docs.first.data(), 'id': snapshot.docs.first.id};
+      }
+    } catch (e) {
+      debugPrint('FirestoreService.getLatestInstagramAnalysis error. (Suppressed raw exception to prevent JS interop crash)');
+      throw Exception('Database read error. Please check your connection or permissions.');
     }
     return null;
   }

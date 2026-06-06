@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'firebase_options.dart';
 import 'core/navigation/app_router.dart';
 import 'core/services/mock_config.dart';
 import 'core/services/firestore_service.dart';
@@ -21,6 +22,9 @@ import 'features/instagram/data/services/instagram_service.dart';
 import 'features/instagram/data/services/reel_analysis_service.dart';
 import 'features/instagram/data/services/creator_analysis_service.dart';
 import 'features/instagram/presentation/viewmodels/instagram_viewmodel.dart';
+import 'features/instagram/presentation/viewmodels/instagram_profile_analysis_viewmodel.dart';
+import 'features/instagram/data/services/instagram_oauth_service.dart';
+import 'features/instagram/presentation/viewmodels/public_profile_viewmodel.dart';
 
 // Repositories
 import 'features/auth/data/repositories/auth_repository.dart';
@@ -37,7 +41,9 @@ void main() async {
   final crashlyticsService = CrashlyticsService();
 
   try {
-    await Firebase.initializeApp();
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
     MockConfig.useMockMode = false;
     debugPrint('ReelIQ: Live Firebase initialisation successful.');
   } catch (e) {
@@ -61,9 +67,14 @@ void main() async {
   final apiService = AnalysisApiService();
   final analysisRepository = AnalysisRepository(apiService);
   final hookTestingRepository = HookTestingRepository();
-  final instagramService = MockInstagramService();
-  final reelAnalysisService = MockReelAnalysisService(apiService);
-  final creatorAnalysisService = MockCreatorAnalysisService();
+  final instagramOAuthService = InstagramOAuthService();
+  final instagramService = RealInstagramService(
+    oauthService: instagramOAuthService,
+    firestoreService: firestoreService,
+    authRepository: authRepository,
+  );
+  final reelAnalysisService = RealReelAnalysisService(apiService);
+  final creatorAnalysisService = RealCreatorAnalysisService(instagramOAuthService);
   final plannerApiService = PlannerApiService();
 
   runApp(
@@ -88,6 +99,7 @@ void main() async {
         Provider<ReelAnalysisService>.value(value: reelAnalysisService),
         Provider<CreatorAnalysisService>.value(value: creatorAnalysisService),
         Provider<PlannerApiService>.value(value: plannerApiService),
+        Provider<InstagramOAuthService>.value(value: instagramOAuthService),
 
         // ─── ViewModels ─────────────────────────────────────
         ChangeNotifierProvider<AuthViewModel>(
@@ -117,6 +129,15 @@ void main() async {
         ),
         ChangeNotifierProvider<PlannerViewModel>(
           create: (context) => PlannerViewModel(plannerApiService),
+        ),
+        ChangeNotifierProvider<InstagramProfileAnalysisViewModel>(
+          create: (context) => InstagramProfileAnalysisViewModel(
+            instagramOAuthService,
+            firestoreService,
+          ),
+        ),
+        ChangeNotifierProvider<PublicProfileViewModel>(
+          create: (context) => PublicProfileViewModel(),
         ),
       ],
       child: const ReelIQApp(),

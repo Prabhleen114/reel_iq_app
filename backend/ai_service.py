@@ -58,7 +58,7 @@ class AIService:
         frames_metadata: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
-        Uses Groq Free Tier (Llama3-8b-8192) to perform structured video analysis.
+        Uses Groq Free Tier (Llama-3.1-8b-instant) to perform structured video analysis.
         """
         # Format the system prompt for structured JSON output
         system_prompt = (
@@ -95,7 +95,7 @@ class AIService:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0.3,
             response_format={"type": "json_object"}
         )
@@ -358,7 +358,7 @@ class AIService:
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
             ],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
             temperature=0.4,
             response_format={"type": "json_object"}
         )

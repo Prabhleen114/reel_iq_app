@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/content_calendar_model.dart';
@@ -6,7 +7,18 @@ import '../models/content_calendar_model.dart';
 class PlannerApiService {
   final String baseUrl;
 
-  PlannerApiService({this.baseUrl = 'http://127.0.0.1:8000'});
+  // Set this to true if testing on Android Emulator, false if testing on physical Android device
+  static const bool _isEmulator = false;
+  
+  static String _getBaseUrl() {
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (Platform.isAndroid) {
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
+    }
+    return 'http://127.0.0.1:8000';
+  }
+
+  PlannerApiService({String? baseUrl}) : baseUrl = baseUrl ?? _getBaseUrl();
 
   Future<ContentCalendarModel?> generateCalendar({
     required String niche,

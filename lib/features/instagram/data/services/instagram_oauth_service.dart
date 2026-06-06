@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -6,10 +7,7 @@ import 'package:http/http.dart' as http;
 /// See: https://developers.facebook.com/apps/
 class InstagramOAuthConfig {
   /// Your Meta App ID from https://developers.facebook.com/apps/
-  static const String appId = 'YOUR_META_APP_ID';
-
-  /// Your Meta App Secret (keep server-side only in production).
-  static const String appSecret = 'YOUR_META_APP_SECRET';
+  static const String appId = '977804481904709';
 
   /// OAuth redirect URI registered in your Meta App dashboard.
   /// Must be HTTPS and exactly match what's in the developer console.
@@ -23,12 +21,19 @@ class InstagramOAuthConfig {
     'pages_read_engagement',
   ];
 
-  static String get authorizeUrl =>
-      'https://api.instagram.com/oauth/authorize'
-      '?client_id=$appId'
-      '&redirect_uri=${Uri.encodeComponent(redirectUri)}'
-      '&scope=${scopes.join(',')}'
-      '&response_type=code';
+  static String get authorizeUrl {
+    final url = 'https://www.facebook.com/v19.0/dialog/oauth'
+        '?client_id=$appId'
+        '&redirect_uri=${Uri.encodeComponent(redirectUri)}'
+        '&scope=${scopes.join(',')}'
+        '&response_type=code';
+    debugPrint('--- META OAUTH DEBUG ---');
+    debugPrint('OAuth URL: $url');
+    debugPrint('App ID: $appId');
+    debugPrint('Redirect URI: $redirectUri');
+    debugPrint('------------------------');
+    return url;
+  }
 }
 
 /// Result returned after a successful OAuth token exchange.
@@ -60,98 +65,92 @@ class InstagramOAuthService {
   static const String _graphBase = 'https://graph.instagram.com';
   static const String _oauthBase = 'https://api.instagram.com';
 
+  // Set this to true if testing on Android Emulator, false if testing on physical Android device
+  static const bool _isEmulator = false;
+
   /// Generates the OAuth authorization URL to open in a WebView.
   String getAuthorizeUrl() => InstagramOAuthConfig.authorizeUrl;
 
-  /// Exchanges an authorization code for a short-lived access token,
-  /// then immediately exchanges it for a long-lived token.
+  /// Exchanges an authorization code for a long-lived access token via the backend.
   Future<InstagramTokenResult> exchangeCodeForToken(String code) async {
-    // Step 1: Short-lived token
-    final shortTokenResponse = await http.post(
-      Uri.parse('$_oauthBase/oauth/access_token'),
-      body: {
-        'client_id': InstagramOAuthConfig.appId,
-        'client_secret': InstagramOAuthConfig.appSecret,
-        'grant_type': 'authorization_code',
-        'redirect_uri': InstagramOAuthConfig.redirectUri,
+    final baseUrl = _getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/instagram/exchange-token'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
         'code': code,
-      },
-    );
-
-    if (shortTokenResponse.statusCode != 200) {
-      throw Exception(
-          'Instagram token exchange failed: ${shortTokenResponse.body}');
-    }
-
-    final shortData = json.decode(shortTokenResponse.body) as Map<String, dynamic>;
-    final shortToken = shortData['access_token'] as String;
-    final userId = (shortData['user_id'] ?? '').toString();
-
-    // Step 2: Long-lived token (60 days)
-    final longTokenResponse = await http.get(
-      Uri.parse(
-          '$_graphBase/access_token'
-          '?grant_type=ig_exchange_token'
-          '&client_secret=${InstagramOAuthConfig.appSecret}'
-          '&access_token=$shortToken'),
-    );
-
-    if (longTokenResponse.statusCode == 200) {
-      final longData =
-          json.decode(longTokenResponse.body) as Map<String, dynamic>;
-      return InstagramTokenResult(
-        accessToken: longData['access_token'] as String,
-        tokenType: longData['token_type'] as String? ?? 'bearer',
-        expiresIn: longData['expires_in'] as int?,
-        userId: userId,
-      );
-    }
-
-    // Fall back to short-lived token if long exchange fails
-    return InstagramTokenResult(
-      accessToken: shortToken,
-      tokenType: 'bearer',
-      userId: userId,
-    );
-  }
-
-  /// Fetches the authenticated user's Instagram profile.
-  Future<Map<String, dynamic>> fetchUserProfile(String accessToken) async {
-    final response = await http.get(
-      Uri.parse(
-          '$_graphBase/me'
-          '?fields=id,username,name,biography,followers_count,follows_count,media_count,profile_picture_url,website'
-          '&access_token=$accessToken'),
+        'redirect_uri': InstagramOAuthConfig.redirectUri,
+      }),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to fetch Instagram profile: ${response.body}');
+      throw Exception('Backend token exchange failed: ${response.body}');
+    }
+
+    final data = json.decode(response.body) as Map<String, dynamic>;
+    return InstagramTokenResult(
+      accessToken: data['access_token'] as String,
+      tokenType: data['token_type'] as String? ?? 'bearer',
+      expiresIn: data['expires_in'] as int?,
+      userId: data['user_id'] as String,
+    );
+  }
+
+  static String _getBaseUrl() {
+    if (kIsWeb) return 'http://127.0.0.1:8000';
+    if (Platform.isAndroid) {
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
+    }
+    return 'http://127.0.0.1:8000';
+  }
+
+  /// Fetches the authenticated user's Instagram profile via backend proxy.
+  Future<Map<String, dynamic>> fetchUserProfile(String accessToken) async {
+    final baseUrl = _getBaseUrl();
+    final response = await http.get(
+      Uri.parse('$baseUrl/instagram/profile?access_token=$accessToken'),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to fetch Instagram profile via proxy: ${response.body}');
     }
 
     return json.decode(response.body) as Map<String, dynamic>;
   }
 
-  /// Fetches the user's recent media (reels/posts).
+  /// Fetches the user's recent media (reels/posts) via backend proxy.
   Future<List<Map<String, dynamic>>> fetchUserMedia(String accessToken,
       {int limit = 25}) async {
+    final baseUrl = _getBaseUrl();
     final response = await http.get(
-      Uri.parse(
-          '$_graphBase/me/media'
-          '?fields=id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count'
-          '&limit=$limit'
-          '&access_token=$accessToken'),
+      Uri.parse('$baseUrl/instagram/media?access_token=$accessToken&limit=$limit'),
     );
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to fetch Instagram media: ${response.body}');
+      throw Exception('Failed to fetch Instagram media via proxy: ${response.body}');
     }
 
-    final data = json.decode(response.body) as Map<String, dynamic>;
-    final List<dynamic> items = data['data'] ?? [];
-    return items
-        .where((item) => item['media_type'] == 'VIDEO' || item['media_type'] == 'REEL')
-        .map((item) => item as Map<String, dynamic>)
-        .toList();
+    final items = json.decode(response.body) as List<dynamic>;
+    return items.map((item) => item as Map<String, dynamic>).toList();
+  }
+
+  /// Sends profile and media data to the backend to get AI insights.
+  Future<Map<String, dynamic>> analyzeProfile(Map<String, dynamic> profileData, List<Map<String, dynamic>> mediaData) async {
+    final baseUrl = _getBaseUrl();
+    final response = await http.post(
+      Uri.parse('$baseUrl/instagram/analyze-profile'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'profile_data': profileData,
+        'media_data': mediaData,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to analyze profile: ${response.body}');
+    }
+
+    return json.decode(response.body) as Map<String, dynamic>;
   }
 
   /// Refreshes a long-lived token before it expires.

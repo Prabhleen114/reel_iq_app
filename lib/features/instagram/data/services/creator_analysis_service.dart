@@ -1,5 +1,6 @@
 import '../models/instagram_profile.dart';
 import '../models/instagram_reel.dart';
+import 'instagram_oauth_service.dart';
 
 class CreatorProfileAnalysis {
   final int creatorScore;
@@ -28,81 +29,59 @@ abstract class CreatorAnalysisService {
   );
 }
 
-class MockCreatorAnalysisService implements CreatorAnalysisService {
+class RealCreatorAnalysisService implements CreatorAnalysisService {
+  final InstagramOAuthService _oauthService;
+
+  RealCreatorAnalysisService(this._oauthService);
+
   @override
   Future<CreatorProfileAnalysis> analyzeCreator(
-    InstagramProfile profile, 
+    InstagramProfile profile,
     List<InstagramReel> reels,
   ) async {
-    // Simulate deep profile-level network/ML scoring delay
-    await Future.delayed(const Duration(milliseconds: 1800));
-
     if (reels.isEmpty) {
       return CreatorProfileAnalysis(
-        creatorScore: 60,
+        creatorScore: 0,
         niche: 'Undetermined',
-        consistencyScore: 30,
-        brandReadinessScore: 50,
-        growthPotentialScore: 55,
+        consistencyScore: 0,
+        brandReadinessScore: 0,
+        growthPotentialScore: 0,
         nicheKeywords: [],
         recommendations: 'Upload more reels to analyze your content style and audience engagement.',
       );
     }
 
-    // Heuristic: Assess niche by scanning keywords in captions
-    int techCount = 0;
-    int designCount = 0;
-    int businessCount = 0;
+    try {
+      final mediaData = reels.map((r) => <String, dynamic>{
+        'id': r.id,
+        'caption': r.caption,
+        'likes_count': r.likesCount,
+        'comments_count': r.commentsCount,
+      }).toList();
 
-    for (final reel in reels) {
-      final caption = reel.caption.toLowerCase();
-      if (caption.contains('code') || caption.contains('developer') || caption.contains('vscode') || caption.contains('programming') || caption.contains('css')) {
-        techCount++;
-      }
-      if (caption.contains('minimalism') || caption.contains('setup') || caption.contains('desk') || caption.contains('design')) {
-        designCount++;
-      }
-      if (caption.contains('startup') || caption.contains('pitch') || caption.contains('business') || caption.contains('niche')) {
-        businessCount++;
-      }
+      final response = await _oauthService.analyzeProfile(profile.toMap(), mediaData);
+      final analysis = response['analysis'] ?? response;
+
+      return CreatorProfileAnalysis(
+        creatorScore: analysis['creator_score'] ?? 0,
+        niche: analysis['niche'] ?? 'Undetermined',
+        consistencyScore: analysis['consistency_score'] ?? 0,
+        brandReadinessScore: analysis['brand_readiness_score'] ?? 0,
+        growthPotentialScore: analysis['growth_potential_score'] ?? 0,
+        nicheKeywords: List<String>.from(analysis['niche_keywords'] ?? []),
+        recommendations: analysis['recommendations'] ?? 'Keep posting consistently.',
+      );
+    } catch (e) {
+      // Fallback in case of failure so the app doesn't crash completely
+      return CreatorProfileAnalysis(
+        creatorScore: 60,
+        niche: 'Backend Analysis Failed',
+        consistencyScore: 50,
+        brandReadinessScore: 50,
+        growthPotentialScore: 50,
+        nicheKeywords: [],
+        recommendations: 'Failed to reach AI backend: $e',
+      );
     }
-
-    String niche = 'Tech Setup & Design';
-    List<String> keywords = ['Minimalism', 'Setup Design'];
-
-    if (techCount > designCount && techCount > businessCount) {
-      niche = 'Software Development & Productivity Hacks';
-      keywords = ['VS Code', 'Coding Shortcuts', 'Software Engineering'];
-    } else if (businessCount > techCount && businessCount > designCount) {
-      niche = 'AI Business Startups & Tech Pitches';
-      keywords = ['AI Startup', 'Elevator Pitches', 'Tech Business'];
-    }
-
-    // Calculate Consistency Score: Average days between posts
-    int consistency = 85; // Good consistency: 2-3 days average
-    
-    // Calculate Brand Readiness: High if likes/engagement ratio is healthy and captions are professional
-    int brandReadiness = 78;
-    if (profile.followersCount > 10000 && reels.any((r) => r.likesCount > 5000)) {
-      brandReadiness += 10;
-    }
-
-    // Calculate Growth Potential: High if followers are growing and total views are steady
-    int growthPotential = 82;
-
-    int creatorScore = ((consistency + brandReadiness + growthPotential) / 3).round();
-
-    return CreatorProfileAnalysis(
-      creatorScore: creatorScore,
-      niche: niche,
-      consistencyScore: consistency,
-      brandReadinessScore: brandReadiness,
-      growthPotentialScore: growthPotential,
-      nicheKeywords: keywords,
-      recommendations: 'Your profile is highly optimized for sponsorships. To unlock 2x growth: '
-          '1. Focus on publishing 3-second tutorial reels showing direct screen captures. '
-          '2. Include a visual "Comment CODE for Link" call to action to boost engagement rates. '
-          '3. Keep posting at your current consistent interval of every 2-3 days.',
-    );
   }
 }

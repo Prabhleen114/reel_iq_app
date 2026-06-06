@@ -66,13 +66,13 @@ class InstagramViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> connect() async {
+  Future<bool> connect(String code) async {
     _isConnecting = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      _profile = await _instagramService.connectAccount();
+      _profile = await _instagramService.connectAccount(code);
       _isConnecting = false;
       notifyListeners();
       await fetchLibrary();

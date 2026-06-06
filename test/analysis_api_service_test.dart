@@ -56,8 +56,8 @@ void main() {
       print('Suggested Hooks: ${insights.suggestedHooks.map((e) => "${e.type}: ${e.text}").toList()}');
     });
 
-    test('MockReelAnalysisService analyzeReel calls analyze-url and parses successfully', () async {
-      final reelService = MockReelAnalysisService(apiService);
+    test('RealReelAnalysisService analyzeReel calls analyze-url and parses successfully', () async {
+      final reelService = RealReelAnalysisService(apiService);
       final reel = InstagramReel(
         id: 'test-reel-id',
         thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
