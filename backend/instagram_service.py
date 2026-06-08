@@ -1,10 +1,11 @@
 import os
 import json
+import re
+import time
+import glob
 from typing import Dict, Any, List
 import instaloader
 from itertools import islice
-
-import glob
 
 try:
     from groq import Groq
@@ -263,76 +264,268 @@ class InstagramService:
             ]
         }
 
+    @staticmethod
+    def _parse_count(text: str) -> int:
+        """Parse abbreviated counts like '104M', '1.2K', '4,437'."""
+        text = text.strip().replace(',', '')
+        multiplier = 1
+        if text.upper().endswith('K'):
+            multiplier = 1000
+            text = text[:-1]
+        elif text.upper().endswith('M'):
+            multiplier = 1000000
+            text = text[:-1]
+        elif text.upper().endswith('B'):
+            multiplier = 1000000000
+            text = text[:-1]
+        try:
+            return int(float(text) * multiplier)
+        except ValueError:
+            return 0
+
     def scrape_public_profile(self, username: str) -> Dict[str, Any]:
         """
-        Scrapes public Instagram profile data using Instaloader.
-        Collects profile info and latest 25 posts.
+        Scrapes public Instagram profile data using a hybrid approach:
+        1. HTML meta tags for follower/following/post counts and user ID
+        2. web_profile_info API for bio/category (when not rate-limited)
+        3. Feed API for post data (most reliable)
         """
+        print("\n[STEP 1] Using Hybrid Scraper - Initializing session")
         print(f"[DEBUG] scrape_public_profile called with username: '{username}'")
         print(f"[DEBUG] Authenticated session: {self._session_loaded}")
-        # Ensure normalization
         normalized_username = username.strip().lstrip('@').lower()
         print(f"[DEBUG] Normalized username: '{normalized_username}'")
-        
+
+        if not self._session_loaded:
+            raise ValueError("No authenticated Instagram session. Run 'python create_session.py <username>' first.")
+
+        session = self.L.context._session
+        cookies = {c.name: c.value for c in session.cookies}
+        api_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'X-IG-App-ID': '936619743392459',
+            'X-CSRFToken': cookies.get('csrftoken', ''),
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': '*/*',
+        }
+
+        user_id = None
+        display_name = normalized_username
+        followers_count = 0
+        following_count = 0
+        media_count = 0
+        biography = ''
+        category = 'Creator'
+        is_private = False
+        profile_pic = ''
+
+        # ── Step 2: Get follower/following/post counts and user_id from HTML ──
+        print("[STEP 2] Fetching HTML profile page for meta tags and user ID...")
         try:
-            print(f"[DEBUG] Calling instaloader.Profile.from_username for '{normalized_username}'...")
-            profile = instaloader.Profile.from_username(self.L.context, normalized_username)
-            print(f"[DEBUG] Successfully retrieved profile: {profile.username}")
-            
-            if profile.is_private:
-                print(f"[DEBUG] Profile '{normalized_username}' is private.")
-                raise ValueError("This account is private. Cannot analyze private profiles.")
-            
-            profile_data = {
-                "username": profile.username,
-                "display_name": profile.full_name,
-                "biography": profile.biography,
-                "category": getattr(profile, 'business_category_name', None) or 'Creator',
-                "followers_count": profile.followers,
-                "follows_count": profile.followees,
-                "media_count": profile.mediacount,
-                "profile_picture_url": profile.profile_pic_url
+            html_headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
             }
-            print(f"[DEBUG] Profile data extracted for '{normalized_username}'. Extracting media...")
-            
-            media_data = []
-            
-            posts = profile.get_posts()
-            for post in islice(posts, 25):
-                media_data.append({
-                    "id": post.shortcode,
-                    "caption": post.caption if post.caption else "",
-                    "media_type": "VIDEO" if post.is_video else "IMAGE",
-                    "media_url": post.url,
-                    "thumbnail_url": post.url,
-                    "permalink": f"https://www.instagram.com/p/{post.shortcode}/",
-                    "timestamp": post.date_utc.isoformat() if post.date_utc else None,
-                    "like_count": post.likes,
-                    "comments_count": post.comments
-                })
-            
-            print(f"[DEBUG] Extracted {len(media_data)} recent posts for '{normalized_username}'.")
-            return {
-                "profile_data": profile_data,
-                "media_data": media_data
-            }
-        except instaloader.exceptions.ProfileNotExistsException as e:
-            print(f"[ERROR] Instaloader raised ProfileNotExistsException for '{normalized_username}': {str(e)}")
-            # Often, Instagram returns 404 or blocks the request if unauthenticated, leading to this error.
-            raise ValueError(f"ProfileNotExistsException: Could not load profile '{normalized_username}'. Instagram may be blocking the unauthenticated request or the username is truly invalid. Original error: {str(e)}")
-        except instaloader.exceptions.ConnectionException as e:
-            print(f"[ERROR] Instaloader raised ConnectionException for '{normalized_username}': {str(e)}")
-            raise ValueError(f"ConnectionException: Failed to connect to Instagram. Original error: {str(e)}")
+            page_resp = session.get(f'https://www.instagram.com/{normalized_username}/', headers=html_headers)
+            print(f"[DEBUG] HTML page status: {page_resp.status_code}, length: {len(page_resp.text)}")
+
+            if page_resp.status_code == 200:
+                html = page_resp.text
+                
+                # Extract user_id
+                id_match = re.search(r'"profile_id":"(\d+)"', html)
+                if not id_match:
+                    id_match = re.search(r'"profilePage_uid":"(\d+)"', html)
+                
+                if id_match:
+                    user_id = id_match.group(1)
+                    print(f"[DEBUG] Found user_id from HTML: {user_id}")
+
+                # Extract title for display name
+                title_match = re.search(r'<title>(.*?)\s*[\(\|@]', html)
+                if title_match:
+                    display_name = title_match.group(1).strip()
+
+                # Extract profile picture URL from og:image
+                pic_match = re.search(r'<meta\s+property="og:image"\s+content="(.*?)"', html)
+                if pic_match:
+                    profile_pic = pic_match.group(1).replace('&amp;', '&')
+                    print(f"[DEBUG] Found profile_pic from HTML: {profile_pic[:60]}...")
+
+                meta_match = re.search(r'<meta\s+property="og:description"\s+content="(.*?)"', html)
+                if meta_match:
+                    desc = meta_match.group(1)
+                    print(f"[DEBUG] Meta description: {desc[:120]}")
+                    f_m = re.search(r'([\d,.]+[KMB]?)\s+Followers', desc, re.IGNORECASE)
+                    if f_m:
+                        followers_count = self._parse_count(f_m.group(1))
+                    fo_m = re.search(r'([\d,.]+[KMB]?)\s+Following', desc, re.IGNORECASE)
+                    if fo_m:
+                        following_count = self._parse_count(fo_m.group(1))
+                    p_m = re.search(r'([\d,.]+[KMB]?)\s+Posts', desc, re.IGNORECASE)
+                    if p_m:
+                        media_count = self._parse_count(p_m.group(1))
         except Exception as e:
-            print(f"[ERROR] Instaloader raised unexpected exception for '{normalized_username}': {type(e).__name__} - {str(e)}")
-            raise ValueError(f"Failed to scrape profile: {type(e).__name__} - {str(e)}")
+            print(f"[DEBUG] HTML page fetch failed: {e}")
+
+        # ── Step 3: Try web_profile_info API for bio/category ──
+        print("[STEP 3] Attempting to fetch rich profile metadata (web_profile_info API)...")
+        try:
+            time.sleep(1)
+            api_headers['Referer'] = f'https://www.instagram.com/{normalized_username}/'
+            api_resp = session.get(
+                f'https://www.instagram.com/api/v1/users/web_profile_info/?username={normalized_username}',
+                headers=api_headers
+            )
+            print(f"[DEBUG] web_profile_info status: {api_resp.status_code}")
+
+            if api_resp.status_code == 200:
+                api_data = api_resp.json()
+                user = api_data.get('data', {}).get('user', {})
+                biography = user.get('biography', '') or ''
+                category = user.get('category_name', '') or 'Creator'
+                is_private = user.get('is_private', False)
+                if user.get('profile_pic_url_hd'):
+                    profile_pic = user['profile_pic_url_hd']
+                if user.get('id') and not user_id:
+                    user_id = user['id']
+                if user.get('edge_followed_by', {}).get('count'):
+                    followers_count = user['edge_followed_by']['count']
+                if user.get('edge_follow', {}).get('count'):
+                    following_count = user['edge_follow']['count']
+                if user.get('edge_owner_to_timeline_media', {}).get('count'):
+                    media_count = user['edge_owner_to_timeline_media']['count']
+                if user.get('full_name'):
+                    display_name = user['full_name']
+                print(f"[DEBUG] web_profile_info API loaded successfully")
+            else:
+                print(f"[DEBUG] web_profile_info unavailable ({api_resp.status_code}), using meta tag data")
+        except Exception as e:
+            print(f"[DEBUG] web_profile_info API error: {e}")
+
+        if is_private:
+            raise ValueError("This account is private. Cannot analyze private profiles.")
+
+        profile_data = {
+            "username": normalized_username,
+            "display_name": display_name,
+            "biography": biography,
+            "category": category,
+            "followers_count": followers_count,
+            "follows_count": following_count,
+            "media_count": media_count,
+            "profile_picture_url": profile_pic,
+        }
+        print(f"[DEBUG] Profile data: followers={followers_count}, following={following_count}, posts={media_count}")
+
+        # ── Step 4: Get posts via Feed API (most reliable) ──
+        print("[STEP 4] Fetching latest posts via Feed API...")
+        media_data = []
+        if user_id:
+            try:
+                print(f"[DEBUG] Fetching posts via feed API for user_id={user_id}...")
+                time.sleep(1)
+                api_headers['Referer'] = f'https://www.instagram.com/{normalized_username}/'
+
+                all_items = []
+                max_id = None
+                # Paginate to get up to 25 posts (Instagram returns ~12 per page)
+                for page in range(3):
+                    url = f'https://www.instagram.com/api/v1/feed/user/{user_id}/?count=25'
+                    if max_id:
+                        url += f'&max_id={max_id}'
+                    feed_resp = session.get(url, headers=api_headers)
+                    print(f"[DEBUG] Feed API page {page+1} status: {feed_resp.status_code}")
+
+                    if feed_resp.status_code != 200:
+                        print(f"[DEBUG] Feed API error: {feed_resp.text[:200]}")
+                        break
+
+                    feed_data = feed_resp.json()
+                    items = feed_data.get('items', [])
+                    all_items.extend(items)
+                    print(f"[DEBUG] Got {len(items)} posts (total: {len(all_items)})")
+
+                    if len(all_items) >= 25 or not feed_data.get('more_available', False):
+                        break
+                    max_id = feed_data.get('next_max_id')
+                    if not max_id:
+                        break
+                    time.sleep(1)
+
+                # Also extract bio from first post's user object if we still don't have it
+                if not biography and all_items:
+                    first_user = all_items[0].get('user', {})
+                    biography = first_user.get('biography', '') or ''
+                    if first_user.get('category'):
+                        category = first_user['category']
+                    if first_user.get('follower_count') and not followers_count:
+                        followers_count = first_user['follower_count']
+                    if first_user.get('following_count') and not following_count:
+                        following_count = first_user['following_count']
+                    if first_user.get('media_count') and not media_count:
+                        media_count = first_user['media_count']
+                    # Update profile_data with any newly discovered data
+                    profile_data['biography'] = biography
+                    profile_data['category'] = category
+                    profile_data['followers_count'] = followers_count or profile_data['followers_count']
+                    profile_data['follows_count'] = following_count or profile_data['follows_count']
+                    profile_data['media_count'] = media_count or profile_data['media_count']
+
+                for item in all_items[:25]:
+                    caption_text = ''
+                    if item.get('caption'):
+                        caption_text = item['caption'].get('text', '')
+                    media_data.append({
+                        "id": item.get('code', ''),
+                        "caption": caption_text,
+                        "media_type": "VIDEO" if item.get('media_type') == 2 else "IMAGE",
+                        "media_url": "",
+                        "thumbnail_url": "",
+                        "permalink": f"https://www.instagram.com/p/{item.get('code', '')}/",
+                        "timestamp": time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(item.get('taken_at', 0))) if item.get('taken_at') else None,
+                        "like_count": item.get('like_count', 0),
+                        "comments_count": item.get('comment_count', 0),
+                    })
+                print(f"[DEBUG] Extracted {len(media_data)} posts for '{normalized_username}'")
+            except Exception as e:
+                print(f"[ERROR] Feed API error: {type(e).__name__} - {str(e)}")
+
+        # --- DIAGNOSTICS FOR USER ---
+        print("\n=== SCRAPER RAW VALUES ===")
+        print(f"  Username: {profile_data['username']}")
+        print(f"  Followers: {profile_data['followers_count']}")
+        print(f"  Following: {profile_data['follows_count']}")
+        print(f"  Media Count: {profile_data['media_count']}")
+        print(f"  Posts collected: {len(media_data)}")
+        if len(media_data) > 0:
+            print("\n  Top 3 posts:")
+            # sort by likes to show top 3
+            sorted_media = sorted(media_data, key=lambda x: x['like_count'], reverse=True)
+            for i, p in enumerate(sorted_media[:3]):
+                cap = p['caption'][:40].replace('\n', ' ') if p['caption'] else '(no caption)'
+                print(f"    {i+1}. Likes: {p['like_count']} | Comments: {p['comments_count']} | Cap: {cap}...")
+        print("==========================\n")
+
+        return {
+            "profile_data": profile_data,
+            "media_data": media_data
+        }
 
     def analyze_public_profile(self, profile_data: Dict[str, Any], stats: Dict[str, Any], username: str) -> Dict[str, Any]:
         """
-        Uses Groq AI to generate a comprehensive 18-point profile analysis.
+        Uses Groq AI to generate an 18-point audit based on scraped profile data and calculated stats.
         """
-        if not self.client:
-            raise ValueError("GROQ_API_KEY is not configured.")
+        
+        print("\n=== GROQ INPUT PAYLOAD ===")
+        print(f"profile_data: {json.dumps(profile_data, indent=2)[:500]}...")
+        print(f"statistics: {json.dumps(stats, indent=2)[:500]}...")
+        print(f"number of media items: {stats.get('total_posts_analyzed', 0)}")
+        print("==========================\n")
+
+        if not HAS_GROQ or not self.client:
+            print("[WARNING] Groq API client not initialized. Returning dummy data.")
 
         system_prompt = (
             "You are ReelIQ, an elite Instagram Growth Strategist. Analyze the given public Instagram profile statistics and content.\n"

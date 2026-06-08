@@ -159,6 +159,11 @@ class _InstagramUsernameAnalysisScreenState extends State<InstagramUsernameAnaly
     final analysis = vm.currentAnalysis!;
     final ai = analysis.aiAnalysis;
     final profile = analysis.profileSnapshot;
+    
+    final profilePicUrl = profile['profile_picture_url'] as String?;
+    debugPrint('=== UI DIAGNOSTICS ===');
+    debugPrint('Parsed profilePictureUrl: $profilePicUrl');
+    debugPrint('======================');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,11 +171,33 @@ class _InstagramUsernameAnalysisScreenState extends State<InstagramUsernameAnaly
         // Header
         Row(
           children: [
-            CircleAvatar(
-              radius: 30,
-              backgroundImage: NetworkImage(profile['profile_picture_url'] ?? ''),
-              backgroundColor: AppTheme.cardBackground,
-            ),
+            profilePicUrl != null && profilePicUrl.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(
+                      profilePicUrl,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        debugPrint('UI: Image load error: $error');
+                        return Container(
+                          width: 60,
+                          height: 60,
+                          color: AppTheme.cardBackground,
+                          child: const Icon(Icons.person, color: AppTheme.textMuted),
+                        );
+                      },
+                    ),
+                  )
+                : Container(
+                    width: 60,
+                    height: 60,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppTheme.cardBackground,
+                    ),
+                    child: const Icon(Icons.person, color: AppTheme.textMuted),
+                  ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(

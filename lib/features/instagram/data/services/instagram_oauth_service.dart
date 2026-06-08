@@ -74,8 +74,10 @@ class InstagramOAuthService {
   /// Exchanges an authorization code for a long-lived access token via the backend.
   Future<InstagramTokenResult> exchangeCodeForToken(String code) async {
     final baseUrl = _getBaseUrl();
+    final uri = Uri.parse('$baseUrl/instagram/exchange-token');
+    debugPrint('[API REQUEST] $uri');
     final response = await http.post(
-      Uri.parse('$baseUrl/instagram/exchange-token'),
+      uri,
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'code': code,
@@ -99,7 +101,7 @@ class InstagramOAuthService {
   static String _getBaseUrl() {
     if (kIsWeb) return 'http://127.0.0.1:8000';
     if (Platform.isAndroid) {
-      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.0.119:8000';
     }
     return 'http://127.0.0.1:8000';
   }
@@ -107,9 +109,9 @@ class InstagramOAuthService {
   /// Fetches the authenticated user's Instagram profile via backend proxy.
   Future<Map<String, dynamic>> fetchUserProfile(String accessToken) async {
     final baseUrl = _getBaseUrl();
-    final response = await http.get(
-      Uri.parse('$baseUrl/instagram/profile?access_token=$accessToken'),
-    );
+    final uri = Uri.parse('$baseUrl/instagram/profile?access_token=$accessToken');
+    debugPrint('[API REQUEST] $uri');
+    final response = await http.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch Instagram profile via proxy: ${response.body}');
@@ -122,9 +124,9 @@ class InstagramOAuthService {
   Future<List<Map<String, dynamic>>> fetchUserMedia(String accessToken,
       {int limit = 25}) async {
     final baseUrl = _getBaseUrl();
-    final response = await http.get(
-      Uri.parse('$baseUrl/instagram/media?access_token=$accessToken&limit=$limit'),
-    );
+    final uri = Uri.parse('$baseUrl/instagram/media?access_token=$accessToken&limit=$limit');
+    debugPrint('[API REQUEST] $uri');
+    final response = await http.get(uri);
 
     if (response.statusCode != 200) {
       throw Exception('Failed to fetch Instagram media via proxy: ${response.body}');
@@ -137,8 +139,10 @@ class InstagramOAuthService {
   /// Sends profile and media data to the backend to get AI insights.
   Future<Map<String, dynamic>> analyzeProfile(Map<String, dynamic> profileData, List<Map<String, dynamic>> mediaData) async {
     final baseUrl = _getBaseUrl();
+    final uri = Uri.parse('$baseUrl/instagram/analyze-profile');
+    debugPrint('[API REQUEST] $uri');
     final response = await http.post(
-      Uri.parse('$baseUrl/instagram/analyze-profile'),
+      uri,
       headers: {'Content-Type': 'application/json'},
       body: json.encode({
         'profile_data': profileData,

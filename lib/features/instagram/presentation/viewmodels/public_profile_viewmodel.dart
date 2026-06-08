@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../data/models/public_profile_analysis_model.dart';
-import '../data/services/public_instagram_service.dart';
+import '../../data/models/public_profile_analysis_model.dart';
+import '../../data/services/public_instagram_service.dart';
 
 class PublicProfileViewModel extends ChangeNotifier {
   final PublicInstagramService _service = PublicInstagramService();

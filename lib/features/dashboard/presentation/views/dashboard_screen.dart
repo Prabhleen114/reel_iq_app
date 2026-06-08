@@ -639,6 +639,7 @@ class DashboardHomeView extends StatelessWidget {
                   childCount: dashboardVM.analyses.length,
                 ),
               ),
+            ),
           // Advanced Analytics
           SliverToBoxAdapter(
             child: Padding(

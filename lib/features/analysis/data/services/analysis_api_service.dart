@@ -13,7 +13,7 @@ class AnalysisApiService {
   static String _getBaseUrl() {
     if (kIsWeb) return 'http://127.0.0.1:8000';
     if (Platform.isAndroid) {
-      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.0.119:8000';
     }
     return 'http://127.0.0.1:8000';
   }
@@ -33,6 +33,7 @@ class AnalysisApiService {
       request.fields['title'] = title;
       request.files.add(await http.MultipartFile.fromPath('file', videoFile.path));
       
+      debugPrint('[API REQUEST] $uri');
       debugPrint('ReelIQ API: Uploading video file to backend ($uri)...');
       
       // Setting a generous 5-minute timeout for local Whisper transcription runs
@@ -58,6 +59,7 @@ class AnalysisApiService {
   Future<BackendAnalysisResponse?> analyzeReelFromUrl(String videoUrl, String title, String caption) async {
     try {
       final uri = Uri.parse('$baseUrl/analyze-url');
+      debugPrint('[API REQUEST] $uri');
       debugPrint('ReelIQ API: Sending URL request to backend ($uri)...');
       
       final response = await http.post(

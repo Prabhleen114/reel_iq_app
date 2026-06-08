@@ -8,10 +8,13 @@ import '../models/public_profile_analysis_model.dart';
 class PublicInstagramService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
+  // Set this to true if testing on Android Emulator, false if testing on physical Android device
+  static const bool _isEmulator = false;
+
   static String _getBaseUrl() {
     if (kIsWeb) return 'http://127.0.0.1:8000';
     if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000'; // Emulator
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.0.119:8000';
     }
     return 'http://127.0.0.1:8000';
   }
@@ -28,13 +31,17 @@ class PublicInstagramService {
     final cacheRef = await _firestore
         .collection('public_profile_analysis')
         .where('searchedUsername', isEqualTo: username)
-        .orderBy('createdAt', descending: true)
-        .limit(1)
         .get();
 
     if (cacheRef.docs.isNotEmpty) {
-      final doc = cacheRef.docs.first;
-      final cachedModel = PublicProfileAnalysisModel.fromMap(doc.data(), doc.id);
+      final models = cacheRef.docs
+          .map((doc) => PublicProfileAnalysisModel.fromMap(doc.data(), doc.id))
+          .toList();
+          
+      // Sort in-memory to avoid requiring composite index
+      models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      
+      final cachedModel = models.first;
       
       final cacheAge = DateTime.now().difference(cachedModel.createdAt);
       if (cacheAge.inHours < 24) {
@@ -45,8 +52,10 @@ class PublicInstagramService {
     // 3. Call backend if no valid cache
     final baseUrl = _getBaseUrl();
     try {
+      final uri = Uri.parse('$baseUrl/instagram/public-profile-analysis');
+      debugPrint('[API REQUEST] $uri');
       final response = await http.post(
-        Uri.parse('$baseUrl/instagram/public-profile-analysis'),
+        uri,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'username': username}),
       ).timeout(const Duration(seconds: 45)); // Give backend time to scrape and run groq
@@ -90,11 +99,15 @@ class PublicInstagramService {
     final query = await _firestore
         .collection('public_profile_analysis')
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
         .get();
         
-    return query.docs
+    final models = query.docs
         .map((doc) => PublicProfileAnalysisModel.fromMap(doc.data(), doc.id))
         .toList();
+        
+    // Sort in-memory to avoid requiring composite index
+    models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    
+    return models;
   }
 }
