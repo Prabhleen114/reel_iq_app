@@ -6,11 +6,18 @@ class UserModel {
 
   // Production fields
   final bool isPro;
-  final int creatorLevel;
-  final int creatorXp;
-  final int creatorStreak;
+  final int appStreak;
   final int analysesPerformed;
   final String instagramHandle;
+  final String profilePictureUrl;
+  final int followersCount;
+  final double engagementRate;
+  final String niche;
+  final String audiencePersona;
+  final DateTime? lastOpenedDate;
+  final bool onboardingCompleted;
+  final List<String> interests;
+  final String cameraConfidence;
   final DateTime? planExpiry;
   final DateTime createdAt;
   final List<String> completedQuests;
@@ -21,11 +28,18 @@ class UserModel {
     required this.displayName,
     this.photoUrl,
     this.isPro = false,
-    this.creatorLevel = 1,
-    this.creatorXp = 0,
-    this.creatorStreak = 0,
+    this.appStreak = 1,
     this.analysesPerformed = 0,
     this.instagramHandle = '',
+    this.profilePictureUrl = '',
+    this.followersCount = 0,
+    this.engagementRate = 0.0,
+    this.niche = '',
+    this.audiencePersona = '',
+    this.lastOpenedDate,
+    this.onboardingCompleted = false,
+    this.interests = const [],
+    this.cameraConfidence = '',
     this.planExpiry,
     DateTime? createdAt,
     this.completedQuests = const [],
@@ -38,11 +52,20 @@ class UserModel {
       displayName: map['displayName'] ?? '',
       photoUrl: map['photoUrl'],
       isPro: map['isPro'] ?? false,
-      creatorLevel: map['creatorLevel'] ?? 1,
-      creatorXp: map['creatorXp'] ?? 0,
-      creatorStreak: map['creatorStreak'] ?? 0,
+      appStreak: map['appStreak'] ?? 1,
       analysesPerformed: map['analysesPerformed'] ?? 0,
       instagramHandle: map['instagramHandle'] ?? '',
+      profilePictureUrl: map['profilePictureUrl'] ?? '',
+      followersCount: map['followersCount'] ?? 0,
+      engagementRate: (map['engagementRate'] ?? 0.0).toDouble(),
+      niche: map['niche'] ?? '',
+      audiencePersona: map['audiencePersona'] ?? '',
+      lastOpenedDate: map['lastOpenedDate'] != null
+          ? DateTime.tryParse(map['lastOpenedDate'] as String)
+          : null,
+      onboardingCompleted: map['onboardingCompleted'] ?? false,
+      interests: List<String>.from(map['interests'] ?? []),
+      cameraConfidence: map['cameraConfidence'] ?? '',
       planExpiry: map['planExpiry'] != null
           ? DateTime.tryParse(map['planExpiry'] as String)
           : null,
@@ -60,11 +83,18 @@ class UserModel {
       'displayName': displayName,
       'photoUrl': photoUrl,
       'isPro': isPro,
-      'creatorLevel': creatorLevel,
-      'creatorXp': creatorXp,
-      'creatorStreak': creatorStreak,
+      'appStreak': appStreak,
       'analysesPerformed': analysesPerformed,
       'instagramHandle': instagramHandle,
+      'profilePictureUrl': profilePictureUrl,
+      'followersCount': followersCount,
+      'engagementRate': engagementRate,
+      'niche': niche,
+      'audiencePersona': audiencePersona,
+      'lastOpenedDate': lastOpenedDate?.toIso8601String(),
+      'onboardingCompleted': onboardingCompleted,
+      'interests': interests,
+      'cameraConfidence': cameraConfidence,
       'planExpiry': planExpiry?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'completedQuests': completedQuests,
@@ -77,11 +107,18 @@ class UserModel {
     String? displayName,
     String? photoUrl,
     bool? isPro,
-    int? creatorLevel,
-    int? creatorXp,
-    int? creatorStreak,
+    int? appStreak,
     int? analysesPerformed,
     String? instagramHandle,
+    String? profilePictureUrl,
+    int? followersCount,
+    double? engagementRate,
+    String? niche,
+    String? audiencePersona,
+    DateTime? lastOpenedDate,
+    bool? onboardingCompleted,
+    List<String>? interests,
+    String? cameraConfidence,
     DateTime? planExpiry,
     List<String>? completedQuests,
   }) {
@@ -91,11 +128,18 @@ class UserModel {
       displayName: displayName ?? this.displayName,
       photoUrl: photoUrl ?? this.photoUrl,
       isPro: isPro ?? this.isPro,
-      creatorLevel: creatorLevel ?? this.creatorLevel,
-      creatorXp: creatorXp ?? this.creatorXp,
-      creatorStreak: creatorStreak ?? this.creatorStreak,
+      appStreak: appStreak ?? this.appStreak,
       analysesPerformed: analysesPerformed ?? this.analysesPerformed,
       instagramHandle: instagramHandle ?? this.instagramHandle,
+      profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
+      followersCount: followersCount ?? this.followersCount,
+      engagementRate: engagementRate ?? this.engagementRate,
+      niche: niche ?? this.niche,
+      audiencePersona: audiencePersona ?? this.audiencePersona,
+      lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      interests: interests ?? this.interests,
+      cameraConfidence: cameraConfidence ?? this.cameraConfidence,
       planExpiry: planExpiry ?? this.planExpiry,
       createdAt: createdAt,
       completedQuests: completedQuests ?? this.completedQuests,

@@ -71,118 +71,21 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: Stack(
-        children: [
-          // Background glowing orbs
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withOpacity(0.15),
-                    blurRadius: 100,
-                    spreadRadius: 100,
-                  ),
-                ],
-              ),
-            ),
+      body: Center(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, child) {
+            return Opacity(
+              opacity: _fadeAnimation.value,
+              child: child,
+            );
+          },
+          child: Image.asset(
+            'assets/splash_logo.png',
+            width: 200,
+            fit: BoxFit.contain,
           ),
-          Positioned(
-            bottom: -150,
-            left: -150,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.accent.withOpacity(0.1),
-                    blurRadius: 120,
-                    spreadRadius: 120,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Main content
-          Center(
-            child: AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _fadeAnimation.value,
-                  child: Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: child,
-                  ),
-                );
-              },
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Logo Container with glowing gradient
-                  Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      gradient: AppTheme.primaryGradient,
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppTheme.primary.withOpacity(0.4),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.insights_rounded,
-                      size: 48,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  // Title
-                  ShaderMask(
-                    shaderCallback: (bounds) => AppTheme.primaryGradient.createShader(bounds),
-                    child: Text(
-                      'ReelIQ',
-                      style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                            color: Colors.white,
-                            letterSpacing: 1.5,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'AI-POWERED VIRAL ENGAGEMENT',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.accent,
-                          letterSpacing: 3.0,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  const SizedBox(height: 48),
-                  const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.accent),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

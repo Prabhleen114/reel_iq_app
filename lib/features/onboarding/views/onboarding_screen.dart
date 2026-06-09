@@ -1,154 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/glass_card.dart';
+import '../../../core/widgets/gradient_button.dart';
+import '../../auth/presentation/viewmodels/auth_viewmodel.dart';
+import '../viewmodels/onboarding_viewmodel.dart';
 
-class OnboardingScreen extends StatefulWidget {
+class OnboardingScreen extends StatelessWidget {
   const OnboardingScreen({super.key});
 
   @override
-  State<OnboardingScreen> createState() => _OnboardingScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => OnboardingViewModel(),
+      child: const _OnboardingScreenContent(),
+    );
+  }
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
-  static const List<_OnboardingPage> _pages = [
-    _OnboardingPage(
-      gradient: LinearGradient(
-        colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      icon: Icons.insights_rounded,
-      tagline: 'STEP 1 OF 3',
-      title: 'Analyze Your\nContent',
-      subtitle:
-          'Upload any Reel and get an AI-powered analysis — hook strength, CTA score, viral potential, and AI-generated rewrites.',
-    ),
-    _OnboardingPage(
-      gradient: LinearGradient(
-        colors: [Color(0xFF8B5CF6), Color(0xFF06B6D4)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      icon: Icons.calendar_month_rounded,
-      tagline: 'STEP 2 OF 3',
-      title: 'Plan Your\nContent Calendar',
-      subtitle:
-          'Generate a complete 30-day content calendar with daily reel ideas, hooks, captions, CTAs, and recommended posting times.',
-    ),
-    _OnboardingPage(
-      gradient: LinearGradient(
-        colors: [Color(0xFF06B6D4), Color(0xFF10B981)],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      icon: Icons.trending_up_rounded,
-      tagline: 'STEP 3 OF 3',
-      title: 'Track Your\nCreator Growth',
-      subtitle:
-          'Connect Instagram, get weekly performance reports, and level up your creator strategy — all powered by local AI.',
-    ),
-  ];
+class _OnboardingScreenContent extends StatefulWidget {
+  const _OnboardingScreenContent();
 
   @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeIn,
-    );
-    _fadeController.forward();
-  }
+  State<_OnboardingScreenContent> createState() => _OnboardingScreenContentState();
+}
+
+class _OnboardingScreenContentState extends State<_OnboardingScreenContent> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
 
   @override
   void dispose() {
     _pageController.dispose();
-    _fadeController.dispose();
     super.dispose();
   }
 
-  Future<void> _completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reeliq_onboarded', true);
-    if (mounted) context.go('/login');
-  }
-
   void _nextPage() {
-    if (_currentPage < _pages.length - 1) {
+    if (_currentPage < 2) {
       _pageController.nextPage(
-        duration: const Duration(milliseconds: 400),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
-    } else {
-      _completeOnboarding();
+    }
+  }
+
+  Future<void> _handleStep1Submit(OnboardingViewModel vm) async {
+    final authVm = Provider.of<AuthViewModel>(context, listen: false);
+    if (authVm.user == null) return;
+    
+    final success = await vm.analyzeInstagram(authVm.user!.uid);
+    if (success && mounted) {
+      _nextPage();
+    }
+  }
+
+  Future<void> _handleFinalSubmit(OnboardingViewModel vm) async {
+    final authVm = Provider.of<AuthViewModel>(context, listen: false);
+    await vm.completeOnboarding(authVm);
+    if (mounted && vm.error == null) {
+      context.go('/');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = Provider.of<OnboardingViewModel>(context);
+
     return Scaffold(
       backgroundColor: AppTheme.background,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Stack(
+      body: SafeArea(
+        child: Column(
           children: [
-            // Background glow
-            Positioned.fill(
-              child: IgnorePointer(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 500),
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      center: Alignment.topCenter,
-                      radius: 1.4,
-                      colors: [
-                        _pages[_currentPage]
-                            .gradient
-                            .colors
-                            .first
-                            .withOpacity(0.08),
-                        AppTheme.background,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Column(
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const SizedBox(height: 60),
-                // Page dots
-                _buildDots(),
-                const Spacer(),
-                // Page view
-                SizedBox(
-                  height: 420,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _pages.length,
-                    onPageChanged: (index) {
-                      setState(() => _currentPage = index);
-                    },
-                    itemBuilder: (context, index) {
-                      return _buildPage(_pages[index]);
-                    },
+                Text(
+                  'STEP ${_currentPage + 1}/3',
+                  style: const TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2.0,
                   ),
                 ),
-                const Spacer(),
-                // Actions
-                _buildActions(),
-                const SizedBox(height: 48),
               ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (index) {
+                final isActive = index <= _currentPage;
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: isActive ? 32 : 12,
+                  height: 4,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    color: isActive ? AppTheme.primary : AppTheme.cardBorder,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                );
+              }),
+            ),
+            if (vm.error != null)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text(vm.error!, style: const TextStyle(color: AppTheme.error)),
+              ),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(), // Disable swipe
+                onPageChanged: (index) => setState(() => _currentPage = index),
+                children: [
+                  _buildStep1(vm),
+                  _buildStep2(vm),
+                  _buildStep3(vm),
+                ],
+              ),
             ),
           ],
         ),
@@ -156,159 +127,185 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildDots() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(_pages.length, (index) {
-        final isActive = index == _currentPage;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          width: isActive ? 24 : 8,
-          height: 8,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            gradient: isActive ? _pages[_currentPage].gradient : null,
-            color: isActive ? null : AppTheme.cardBorder,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildPage(_OnboardingPage page) {
+  Widget _buildStep1(OnboardingViewModel vm) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Icon container
-          Container(
-            width: 100,
-            height: 100,
-            decoration: BoxDecoration(
-              gradient: page.gradient,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: page.gradient.colors.first.withOpacity(0.4),
-                  blurRadius: 32,
-                  spreadRadius: 4,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Icon(page.icon, color: Colors.white, size: 52),
-          ),
-          const SizedBox(height: 40),
-          Text(
-            page.tagline,
-            style: const TextStyle(
-              color: AppTheme.textMuted,
-              fontSize: 11,
-              letterSpacing: 3,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ShaderMask(
-            shaderCallback: (bounds) => page.gradient.createShader(bounds),
-            child: Text(
-              page.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 36,
-                fontWeight: FontWeight.w900,
-                height: 1.1,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            page.subtitle,
+          const Icon(Icons.person_search_rounded, size: 64, color: AppTheme.accent),
+          const SizedBox(height: 24),
+          const Text(
+            'Connect Your Instagram',
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 16,
-              height: 1.6,
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'We will use this to personalize your dashboard and analyze your niche.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 32),
+          TextField(
+            onChanged: vm.setHandle,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: '@username',
+              hintStyle: const TextStyle(color: AppTheme.textMuted),
+              filled: true,
+              fillColor: AppTheme.cardBackground,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              prefixIcon: const Icon(Icons.alternate_email, color: AppTheme.textMuted),
             ),
+          ),
+          const SizedBox(height: 32),
+          GradientButton(
+            text: 'Continue',
+            onPressed: vm.isLoading || vm.handle.isEmpty ? null : () => _handleStep1Submit(vm),
+            isLoading: vm.isLoading,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActions() {
-    final isLast = _currentPage == _pages.length - 1;
+  Widget _buildStep2(OnboardingViewModel vm) {
+    final availableInterests = [
+      'Technology', 'AI', 'Coding', 'Business', 'Finance', 'Education', 
+      'Fitness', 'Gaming', 'Travel', 'Fashion', 'Motivation', 'Entertainment', 'Lifestyle'
+    ];
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(24.0),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: _pages[_currentPage].gradient,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color:
-                        _pages[_currentPage].gradient.colors.first.withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ElevatedButton(
-                onPressed: _nextPage,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: Text(
-                  isLast ? "Let's Get Started" : 'Next',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 17,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+          const SizedBox(height: 40),
+          const Text(
+            'What do you create about?',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Select all that apply. This helps us generate personalized reel ideas.',
+            style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: availableInterests.map((interest) {
+                  final isSelected = vm.interests.contains(interest);
+                  return FilterChip(
+                    label: Text(interest),
+                    selected: isSelected,
+                    onSelected: (_) => vm.toggleInterest(interest),
+                    selectedColor: AppTheme.primary.withOpacity(0.3),
+                    checkmarkColor: AppTheme.primary,
+                    backgroundColor: AppTheme.cardBackground,
+                    side: BorderSide(
+                      color: isSelected ? AppTheme.primary : AppTheme.cardBorder,
+                    ),
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : AppTheme.textSecondary,
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ),
-          if (!isLast) ...[
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: _completeOnboarding,
-              child: const Text(
-                'Skip',
-                style: TextStyle(color: AppTheme.textMuted, fontSize: 14),
-              ),
-            ),
-          ],
+          GradientButton(
+            text: 'Continue',
+            onPressed: vm.interests.isEmpty ? null : _nextPage,
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
-}
 
-class _OnboardingPage {
-  final LinearGradient gradient;
-  final IconData icon;
-  final String tagline;
-  final String title;
-  final String subtitle;
+  Widget _buildStep3(OnboardingViewModel vm) {
+    final confidenceLevels = [
+      'Very Comfortable',
+      'Comfortable',
+      'Nervous',
+      'Camera Shy'
+    ];
 
-  const _OnboardingPage({
-    required this.gradient,
-    required this.icon,
-    required this.tagline,
-    required this.title,
-    required this.subtitle,
-  });
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 40),
+          const Text(
+            'How comfortable are you on camera?',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'We will use this to recommend faceless vs talking-head content.',
+            style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 32),
+          Expanded(
+            child: ListView.builder(
+              itemCount: confidenceLevels.length,
+              itemBuilder: (context, index) {
+                final level = confidenceLevels[index];
+                final isSelected = vm.cameraConfidence == level;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12.0),
+                  child: InkWell(
+                    onTap: () => vm.setCameraConfidence(level),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppTheme.primary.withOpacity(0.2) : AppTheme.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppTheme.primary : AppTheme.cardBorder,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                            color: isSelected ? AppTheme.primary : AppTheme.textMuted,
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            level,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              color: isSelected ? Colors.white : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          GradientButton(
+            text: 'Complete Setup',
+            onPressed: vm.isLoading || vm.cameraConfidence.isEmpty ? null : () => _handleFinalSubmit(vm),
+            isLoading: vm.isLoading,
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
 }

@@ -112,6 +112,15 @@ class AuthViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshUser() async {
+    if (_user == null) return;
+    final freshUser = await _authRepository.refreshUser();
+    if (freshUser != null) {
+      _user = freshUser;
+      notifyListeners();
+    }
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   String _friendlyError(String raw) {

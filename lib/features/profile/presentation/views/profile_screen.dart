@@ -124,14 +124,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: Center(
-                          child: Text(
-                            user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: user.profilePictureUrl.isNotEmpty
+                              ? ClipOval(
+                                  child: Image.network(
+                                    user.profilePictureUrl,
+                                    width: 58,
+                                    height: 58,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Text(
+                                  user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(width: 16),
@@ -156,7 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   Icon(Icons.alternate_email_rounded, color: AppTheme.accent, size: 14),
                                   const SizedBox(width: 4),
                                   Text(
-                                    profileVM.instagramHandle,
+                                    user.instagramHandle.isNotEmpty ? user.instagramHandle : profileVM.instagramHandle,
                                     style: const TextStyle(
                                       color: AppTheme.accent,
                                       fontSize: 13,
@@ -171,20 +180,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ],
                         ),
                       ),
-                      
-                      // Creator Badge (Concept B)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primary.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppTheme.primary.withOpacity(0.2)),
-                        ),
-                        child: Text(
-                          'LV. ${profileVM.creatorLevel}',
-                          style: const TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -196,10 +191,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               // Weekly Creator Report (Concept B / Pro Requirement)
               _buildWeeklyCreatorReport(profileVM),
-              const SizedBox(height: 20),
-
-              // Achievements Badges Row (Concept B)
-              _buildAchievementsBadges(profileVM),
               const SizedBox(height: 20),
 
               // Usage statistics
@@ -487,65 +478,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildAchievementsBadges(ProfileViewModel profileVM) {
-    final badges = [
-      {'icon': '🔥', 'title': 'Streak King', 'unlocked': profileVM.creatorStreak >= 10},
-      {'icon': '📊', 'title': 'Audit Master', 'unlocked': profileVM.analysesPerformed >= 3},
-      {'icon': '🗓️', 'title': 'Plan Expert', 'unlocked': true},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'CREATOR ACHIEVEMENTS',
-          style: TextStyle(
-            color: AppTheme.textMuted,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: badges.map((badge) {
-            final isUnlocked = badge['unlocked'] as bool;
-            return Expanded(
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppTheme.cardBackground.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isUnlocked ? AppTheme.primary.withOpacity(0.2) : Colors.white.withOpacity(0.02),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      badge['icon'] as String,
-                      style: TextStyle(fontSize: 22, color: isUnlocked ? null : Colors.grey),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      badge['title'] as String,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: isUnlocked ? AppTheme.textPrimary : AppTheme.textMuted,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
+  // Achievement section removed
 
   Widget _buildUsageRow(String label, String value, double progressPercent) {
     return Column(

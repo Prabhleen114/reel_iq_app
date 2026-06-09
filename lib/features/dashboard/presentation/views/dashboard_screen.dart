@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
+import '../../../auth/data/models/user_model.dart';
 import '../viewmodels/dashboard_viewmodel.dart';
 import '../viewmodels/planner_viewmodel.dart';
 import '../../../profile/presentation/viewmodels/profile_viewmodel.dart';
@@ -47,8 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     final List<Widget> tabs = [
       DashboardHomeView(
-        userId: user.uid,
-        displayName: user.displayName,
+        user: user,
         onTabChanged: (index) {
           setState(() {
             _currentIndex = index;
@@ -125,137 +125,154 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class DashboardHomeView extends StatelessWidget {
-  final String userId;
-  final String displayName;
+  final UserModel user;
   final Function(int) onTabChanged;
 
   const DashboardHomeView({
     super.key,
-    required this.userId,
-    required this.displayName,
+    required this.user,
     required this.onTabChanged,
   });
+
+  String _getProfilePic() {
+    if (user.profilePictureUrl.isNotEmpty) return user.profilePictureUrl;
+    if (user.photoUrl != null && user.photoUrl!.isNotEmpty) return user.photoUrl!;
+    return '';
+  }
+
+  String _generatePersonalizedSuggestion() {
+    final conf = user.cameraConfidence;
+    final interests = user.interests.isNotEmpty ? user.interests.join(', ') : 'general content';
+
+    if (conf == 'Camera Shy' || conf == 'Nervous') {
+      return 'Since you prefer staying off-camera, try focusing on high-quality screen recordings or faceless reels about $interests with strong voiceovers.';
+    } else if (conf == 'Very Comfortable' || conf == 'Comfortable') {
+      return 'You are a natural on camera! Try making direct talking-head hooks and engaging tutorials about $interests to build trust with your audience.';
+    }
+    return 'Your audience loves your unique perspective on $interests. Try creating more engaging short-form content this week.';
+  }
 
   @override
   Widget build(BuildContext context) {
     final dashboardVM = Provider.of<DashboardViewModel>(context);
-    final profileVM = Provider.of<ProfileViewModel>(context);
     final plannerVM = Provider.of<PlannerViewModel>(context);
-    final size = MediaQuery.of(context).size;
+    
+    final avatarUrl = _getProfilePic();
 
     return RefreshIndicator(
-      onRefresh: () => dashboardVM.loadAnalyses(userId),
+      onRefresh: () => dashboardVM.loadAnalyses(user.uid),
       color: AppTheme.accent,
       backgroundColor: AppTheme.cardBackground,
       child: CustomScrollView(
         slivers: [
-          // Elegant Header Section with Level & Streak
+          // Premium Creator Identity Card
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 64, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'HELLO, ${displayName.toUpperCase()}',
-                              style: const TextStyle(
-                                color: AppTheme.textMuted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.2,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Your dashboard',
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Streak Badge (Concept B)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppTheme.warning.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.warning.withOpacity(0.2)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              '🔥',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '${profileVM.creatorStreak} Days',
-                              style: const TextStyle(
-                                color: AppTheme.warning,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF1E1E1E),
+                      Color(0xFF131313),
                     ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  const SizedBox(height: 16),
-
-                  // Gamification Level and XP Bar (Concept B)
-                  GlassCard(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.primary.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: AppTheme.primary.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Creator Level ${profileVM.creatorLevel}',
-                              style: const TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            Text(
-                              '${profileVM.creatorXp}/${profileVM.xpNeededForNextLevel} XP',
-                              style: const TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: AppTheme.primaryGradient,
+                          ),
+                          child: CircleAvatar(
+                            radius: 36,
+                            backgroundColor: AppTheme.cardBackground,
+                            backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                            child: avatarUrl.isEmpty ? const Icon(Icons.person, size: 36, color: AppTheme.textMuted) : null,
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(4),
-                          child: LinearProgressIndicator(
-                            value: profileVM.creatorXp / profileVM.xpNeededForNextLevel,
-                            minHeight: 6,
-                            backgroundColor: Colors.white.withOpacity(0.04),
-                            valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.displayName.isNotEmpty ? user.displayName : 'Creator',
+                                style: const TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              if (user.instagramHandle.isNotEmpty)
+                                Text(
+                                  user.instagramHandle.startsWith('@') ? user.instagramHandle : '@${user.instagramHandle}',
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.warning.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.warning.withOpacity(0.2)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('🔥', style: TextStyle(fontSize: 16)),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${user.appStreak} Days',
+                                style: const TextStyle(
+                                  color: AppTheme.warning,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 24),
+                    const Divider(color: Color(0xFF2A2A2A)),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildIdentityStat('Followers', '${user.followersCount}'),
+                        _buildIdentityStat('Engagement', '${user.engagementRate.toStringAsFixed(1)}%'),
+                        _buildIdentityStat('Niche', user.niche.isNotEmpty ? user.niche : 'Unknown'),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -297,9 +314,9 @@ class DashboardHomeView extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Your educational reels perform 28% better than motivational reels. Try structuring your next Plan with technical tutorials.',
-                      style: TextStyle(
+                    Text(
+                      _generatePersonalizedSuggestion(),
+                      style: const TextStyle(
                         color: AppTheme.textPrimary,
                         fontSize: 14,
                         height: 1.45,
@@ -401,83 +418,7 @@ class DashboardHomeView extends StatelessWidget {
             ),
           ),
 
-          // Public Instagram Analysis Feature Card
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: InkWell(
-                onTap: () {
-                  context.push('/public-instagram-analysis');
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFF58529).withOpacity(0.15),
-                        const Color(0xFFDD2A7B).withOpacity(0.15),
-                        const Color(0xFF8134AF).withOpacity(0.15),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFDD2A7B).withOpacity(0.3),
-                      width: 1,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.search_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Analyze Public Instagram Profile',
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'Enter a username (e.g. @mrbeast) to get a deep AI audit without logging in.',
-                              style: TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(
-                        Icons.chevron_right_rounded,
-                        color: AppTheme.textMuted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          // Public Instagram Analysis Feature Card removed
 
           // Recent Calendars Section (if any exists)
           if (plannerVM.savedCalendars.isNotEmpty) ...[
@@ -720,6 +661,29 @@ class DashboardHomeView extends StatelessWidget {
     );
   }
 
+  Widget _buildIdentityStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppTheme.textSecondary,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildActionBtn(BuildContext context, String label, IconData icon, Color color, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -747,27 +711,29 @@ class DashboardHomeView extends StatelessWidget {
 
   Widget _buildMetricGrid(String label, String value, String subtext, Color color) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.03)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.05)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             label,
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 1.0),
           ),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w900),
+            style: TextStyle(color: color, fontSize: 26, fontWeight: FontWeight.w900),
           ),
+          const SizedBox(height: 4),
           Text(
             subtext,
-            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 9),
+            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
           ),
         ],
       ),

@@ -3,14 +3,14 @@ import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // Dark colors
-  static const Color background = Color(0xFF090A0F);
-  static const Color cardBackground = Color(0xFF131520);
-  static const Color cardBorder = Color(0xFF222533);
+  static const Color background = Color(0xFF000000); // Pure Black
+  static const Color cardBackground = Color(0xFF131313); // Near Black
+  static const Color cardBorder = Color(0xFF222222);
   
-  // Neon accents
-  static const Color primary = Color(0xFF6366F1); // Indigo
-  static const Color secondary = Color(0xFF8B5CF6); // Violet
-  static const Color accent = Color(0xFF06B6D4); // Cyber Cyan
+  // ReelIQ accents
+  static const Color primary = Color(0xFFFF4D8D); // Pink
+  static const Color secondary = Color(0xFFFF8A5B); // Orange
+  static const Color accent = Color(0xFFFF8A5B); // Orange
   
   // States
   static const Color success = Color(0xFF10B981); // Emerald
@@ -106,7 +106,7 @@ class AppTheme {
   );
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [secondary, accent],
+    colors: [primary, secondary],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );

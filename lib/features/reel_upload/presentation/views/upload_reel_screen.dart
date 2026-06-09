@@ -69,10 +69,8 @@ class _UploadReelScreenState extends State<UploadReelScreen> {
       uploadVM.setTitle(_titleController.text);
       final analysis = await uploadVM.uploadReel(authVM.user!.uid);
       if (analysis != null && mounted) {
-        // Record metrics and reward creator XP!
+        // Record metrics
         profileVM.recordAnalysisPerformed();
-        profileVM.addXp(50);
-        profileVM.completeQuest("Analyze Reel");
         
         // Redirect to analysis result screen
         if (widget.embeddedMode) {

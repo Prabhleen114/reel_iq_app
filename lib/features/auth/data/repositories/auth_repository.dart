@@ -24,9 +24,7 @@ class AuthRepository {
       uid: 'mock-user-123',
       email: 'creator@reeliq.ai',
       displayName: 'Creator Premium',
-      creatorLevel: 5,
-      creatorXp: 340,
-      creatorStreak: 12,
+      appStreak: 12,
       analysesPerformed: 2,
     ),
   ];
@@ -42,14 +40,55 @@ class AuthRepository {
       if (firebaseUser == null) return null;
       // Try to load extended profile from Firestore
       final stored = await _firestoreService.getUser(firebaseUser.uid);
-      return stored ??
+      final user = stored ??
           UserModel(
             uid: firebaseUser.uid,
             email: firebaseUser.email ?? '',
             displayName: firebaseUser.displayName ?? 'ReelIQ Creator',
             photoUrl: firebaseUser.photoURL,
           );
+      return await _processUserStreak(user);
     });
+  }
+
+  Future<UserModel> _processUserStreak(UserModel user) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastOpened = user.lastOpenedDate;
+
+    int newStreak = user.appStreak;
+
+    if (lastOpened != null) {
+      final lastOpenedDay = DateTime(lastOpened.year, lastOpened.month, lastOpened.day);
+      final difference = today.difference(lastOpenedDay).inDays;
+
+      if (difference == 1) {
+        newStreak += 1;
+      } else if (difference > 1) {
+        newStreak = 1;
+      }
+    } else {
+      newStreak = 1;
+    }
+
+    bool needsUpdate = false;
+    if (user.appStreak != newStreak) needsUpdate = true;
+    if (lastOpened == null || lastOpened.year != now.year || lastOpened.month != now.month || lastOpened.day != now.day) {
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      final updatedUser = user.copyWith(
+        appStreak: newStreak,
+        lastOpenedDate: now,
+      );
+      if (!MockConfig.useMockMode) {
+        await _firestoreService.saveUser(updatedUser);
+      }
+      return updatedUser;
+    }
+
+    return user;
   }
 
   // ─── Current User ─────────────────────────────────────────────────────────
@@ -69,6 +108,20 @@ class AuthRepository {
   }
 
   bool get isLoggedIn => currentUser != null;
+
+  // ─── Refresh User ─────────────────────────────────────────────────────────
+
+  Future<UserModel?> refreshUser() async {
+    if (MockConfig.useMockMode) return _currentMockUser;
+    final firebaseUser = _auth.currentUser;
+    if (firebaseUser != null) {
+      final stored = await _firestoreService.getUser(firebaseUser.uid);
+      if (stored != null) {
+        return await _processUserStreak(stored);
+      }
+    }
+    return null;
+  }
 
   // ─── Email / Password Auth ────────────────────────────────────────────────
 
@@ -97,13 +150,14 @@ class AuthRepository {
       final u = credentials.user!;
       // Load extended profile from Firestore
       final stored = await _firestoreService.getUser(u.uid);
-      return stored ??
+      final user = stored ??
           UserModel(
             uid: u.uid,
             email: u.email ?? '',
             displayName: u.displayName ?? email.split('@')[0],
             photoUrl: u.photoURL,
           );
+      return await _processUserStreak(user);
     }
   }
 
@@ -155,9 +209,7 @@ class AuthRepository {
         displayName: 'Google Partner Creator',
         photoUrl:
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb',
-        creatorLevel: 5,
-        creatorXp: 340,
-        creatorStreak: 12,
+        appStreak: 12,
       );
       if (!_mockUsers.any((u) => u.uid == googleMockUser.uid)) {
         _mockUsers.add(googleMockUser);
@@ -180,7 +232,7 @@ class AuthRepository {
       final u = userCredential.user!;
       // Try to load existing profile; create if first time
       final stored = await _firestoreService.getUser(u.uid);
-      if (stored != null) return stored;
+      if (stored != null) return await _processUserStreak(stored);
       final newUser = UserModel(
         uid: u.uid,
         email: u.email ?? '',

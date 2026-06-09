@@ -71,8 +71,6 @@ class _InsightsScreenState extends State<InsightsScreen> with SingleTickerProvid
     };
 
     if (mounted) {
-      profileVM.addXp(75); // Award XP for competitor audit!
-      profileVM.completeQuest("Audit Competitor");
       setState(() {
         _isAnalyzingCompetitor = false;
         _competitorResult = result;

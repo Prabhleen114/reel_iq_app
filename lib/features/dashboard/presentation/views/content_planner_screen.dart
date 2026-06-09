@@ -83,8 +83,6 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
       );
 
       if (calendar != null) {
-        profileVM.addXp(100); // Reward creator with 100 XP!
-        profileVM.completeQuest("Generate Calendar");
         if (calendar.days.isNotEmpty) {
           setState(() {
             _selectedDay = calendar.days.first;

@@ -30,15 +30,24 @@ class AppRouter {
       final isSplash = state.matchedLocation == '/splash';
       final isOnboarding = state.matchedLocation == '/onboarding';
 
-      // Let splash and onboarding handle their own flow
-      if (isSplash || isOnboarding) return null;
+      // Let splash handle its own flow
+      if (isSplash) return null;
 
       if (!isLoggedIn && !isAuthRoute) {
         return '/login';
       }
 
-      if (isLoggedIn && isAuthRoute) {
-        return '/';
+      if (isLoggedIn) {
+        final user = authViewModel.user;
+        if (user != null && !user.onboardingCompleted && !isOnboarding) {
+          return '/onboarding';
+        }
+        if (user != null && user.onboardingCompleted && isOnboarding) {
+          return '/';
+        }
+        if (isAuthRoute) {
+          return '/';
+        }
       }
 
       return null;
@@ -129,12 +138,6 @@ class AppRouter {
         path: '/instagram',
         builder: (BuildContext context, GoRouterState state) {
           return const InstagramLibraryView();
-        },
-      ),
-      GoRoute(
-        path: '/public-instagram-analysis',
-        builder: (BuildContext context, GoRouterState state) {
-          return const InstagramUsernameAnalysisScreen();
         },
       ),
     ],
