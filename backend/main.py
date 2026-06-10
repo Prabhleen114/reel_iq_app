@@ -3,8 +3,10 @@ import shutil
 import uuid
 import subprocess
 from typing import List, Dict, Any, Optional
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query, Response, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Query, Response, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
+import firebase_admin
+from firebase_admin import credentials, firestore
 from pydantic import BaseModel
 import cv2
 import numpy as np
@@ -30,6 +32,19 @@ if os.path.exists(winget_packages_dir):
 # Import our AI Service
 from ai_service import AIService
 from instagram_service import InstagramService
+from payment_service import PaymentService
+
+# Initialize Firebase Admin
+firebase_creds_path = os.getenv("FIREBASE_SERVICE_ACCOUNT_PATH", "./serviceAccountKey.json")
+try:
+    if not firebase_admin._apps:
+        cred = credentials.Certificate(firebase_creds_path)
+        firebase_admin.initialize_app(cred)
+        print("Firebase Admin initialized successfully.")
+    db = firestore.client()
+except Exception as e:
+    print(f"Warning: Firebase Admin initialization failed: {e}")
+    db = None
 
 app = FastAPI(
     title="ReelIQ Video Analysis API",
@@ -89,6 +104,7 @@ async def receive_webhook(request: Request):
 # Initialize AI Service
 ai_service = AIService()
 instagram_service = InstagramService()
+payment_service = PaymentService()
 
 # Dynamic Whisper Import Check
 try:
@@ -715,6 +731,76 @@ async def exchange_instagram_token(req: ExchangeTokenRequest):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ─── Razorpay Subscriptions & Webhooks ───────────────────────────────────────
+
+class CreateSubscriptionRequest(BaseModel):
+    user_id: str
+
+class VerifySubscriptionRequest(BaseModel):
+    subscription_id: str
+    payment_id: str
+    signature: str
+    user_id: str
+
+@app.post("/payments/create-subscription")
+async def create_subscription(req: CreateSubscriptionRequest):
+    try:
+        sub = payment_service.create_subscription(req.user_id)
+        return {
+            "subscription_id": sub.get("id"),
+            "key_id": os.getenv("RAZORPAY_KEY_ID", "")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/payments/verify-subscription")
+async def verify_subscription(req: VerifySubscriptionRequest):
+    is_verified = payment_service.verify_subscription(req.subscription_id, req.payment_id, req.signature)
+    if is_verified:
+        return {
+            "verified": True,
+            "payment_id": req.payment_id,
+            "status": "captured"
+        }
+    else:
+        raise HTTPException(status_code=400, detail="Payment verification failed")
+
+@app.post("/payments/webhook")
+async def razorpay_webhook(request: Request, x_razorpay_signature: str = Header(None)):
+    body = await request.body()
+    
+    if not payment_service.verify_webhook_signature(body, x_razorpay_signature):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    payload = await request.json()
+    event = payload.get("event")
+    
+    if db is None:
+        print("Webhook received but Firebase Admin is not initialized. Skipping Firestore update.")
+        return {"status": "ok"}
+    
+    try:
+        if event in ["subscription.activated", "subscription.charged", "subscription.completed", "subscription.cancelled"]:
+            sub_entity = payload["payload"]["subscription"]["entity"]
+            sub_id = sub_entity.get("id")
+            sub_status = sub_entity.get("status")
+            notes = sub_entity.get("notes", {})
+            user_id = notes.get("user_id")
+            
+            if user_id:
+                user_ref = db.collection("users").doc(user_id)
+                user_ref.update({
+                    "subscriptionStatus": sub_status,
+                    "subscriptionId": sub_id,
+                })
+                print(f"Updated Firestore for user {user_id}: status={sub_status}")
+                
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Webhook processing error: {e}")
+        return {"status": "error", "message": str(e)}
+
 
 if __name__ == "__main__":
     import uvicorn

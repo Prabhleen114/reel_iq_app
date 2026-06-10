@@ -5,6 +5,7 @@ import time
 import glob
 from typing import Dict, Any, List
 import instaloader
+import requests
 from itertools import islice
 
 try:
@@ -291,16 +292,18 @@ class InstagramService:
         3. Feed API for post data (most reliable)
         """
         print("\n[STEP 1] Using Hybrid Scraper - Initializing session")
-        print(f"[DEBUG] scrape_public_profile called with username: '{username}'")
+        print(f"[DEBUG] scrape_public_profile called with username: {repr(username)}")
         print(f"[DEBUG] Authenticated session: {self._session_loaded}")
         normalized_username = username.strip().lstrip('@').lower()
-        print(f"[DEBUG] Normalized username: '{normalized_username}'")
+        print(f"[DEBUG] Normalized username: {repr(normalized_username)}")
 
         if not self._session_loaded:
             raise ValueError("No authenticated Instagram session. Run 'python create_session.py <username>' first.")
 
         session = self.L.context._session
         cookies = {c.name: c.value for c in session.cookies}
+        print(f"[DEBUG] Session cookies attached to requests.Session: {cookies}")
+        
         api_headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'X-IG-App-ID': '936619743392459',
@@ -318,20 +321,98 @@ class InstagramService:
         category = 'Creator'
         is_private = False
         profile_pic = ''
+        
+        html_scrape_success = False
+        web_profile_status = None
 
         # ── Step 2: Get follower/following/post counts and user_id from HTML ──
         print("[STEP 2] Fetching HTML profile page for meta tags and user ID...")
+        html = None
+        html_scrape_success = False
+        
+        # Chrome UA for authenticated session
+        chrome_headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        
+        # Non-Chrome UA for anonymous fallback (Instagram serves SSR HTML with
+        # og:description meta tags to non-browser User-Agents like curl/bots,
+        # but returns an empty JS SPA shell to Chrome/Firefox/Safari UAs)
+        anon_headers = {
+            'User-Agent': 'curl/7.88.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+        }
+        
         try:
-            html_headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-            }
-            page_resp = session.get(f'https://www.instagram.com/{normalized_username}/', headers=html_headers)
+            print(f"[DEBUG] Fetching authenticated HTML for {repr(normalized_username)}")
+            page_resp = session.get(f'https://www.instagram.com/{normalized_username}/', headers=chrome_headers, timeout=10)
+            print(f"[DEBUG] HTML page request URL: https://www.instagram.com/{normalized_username}/")
+            print(f"[DEBUG] HTML page final URL: {page_resp.url}")
+            if page_resp.history:
+                print(f"[DEBUG] HTML page redirect chain: {[r.url for r in page_resp.history]}")
             print(f"[DEBUG] HTML page status: {page_resp.status_code}, length: {len(page_resp.text)}")
 
-            if page_resp.status_code == 200:
-                html = page_resp.text
+            if page_resp.status_code == 200 and "login" not in page_resp.url.lower():
+                # Check if the page is a generic SPA shell (no meta tags)
+                if 'og:description' in page_resp.text:
+                    html = page_resp.text
+                    print("[DEBUG] Authenticated HTML contains og:description - using it")
+                else:
+                    print("[DEBUG] Authenticated HTML is SPA shell (no og:description) - falling through to anonymous")
+                    raise ValueError("Authenticated page is an empty SPA shell")
+            else:
+                raise ValueError(f"Bad status or redirected to {page_resp.url}")
+        except Exception as e:
+            print(f"[DEBUG] Authenticated HTML page fetch failed: {e}")
+            print(f"[DEBUG] Attempting anonymous HTML fallback for {repr(normalized_username)} (curl UA)...")
+            try:
+                anon_resp = requests.get(f'https://www.instagram.com/{normalized_username}/', headers=anon_headers, timeout=15)
+                print(f"[DEBUG] Anonymous HTML fallback status: {anon_resp.status_code}")
+                print(f"[DEBUG] Anonymous HTML fallback final URL: {anon_resp.url}")
+                
+                # Detect bad page types
+                anon_html = anon_resp.text
+                if 'login' in anon_resp.url.lower():
+                    print("[DEBUG] Instagram returned LOGIN page")
+                elif '/challenge/' in anon_resp.url.lower():
+                    print("[DEBUG] Instagram returned CHALLENGE page")
+                elif 'please wait' in anon_html.lower() or 'please_wait' in anon_html.lower():
+                    print("[DEBUG] Instagram returned PLEASE WAIT page")
+                elif '<title>Instagram</title>' in anon_html and 'og:description' not in anon_html:
+                    print("[DEBUG] Instagram returned GENERIC SPA shell (no profile data)")
+                
+                if anon_resp.status_code == 200 and 'og:description' in anon_html:
+                    html = anon_html
+                    print("[DEBUG] Anonymous fallback HTML contains og:description - using it")
+                elif anon_resp.status_code == 200:
+                    print("[DEBUG] Anonymous fallback returned 200 but no og:description found")
+                    # Save for debugging
+                    try:
+                        debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug_instagram_response.html')
+                        with open(debug_path, 'w', encoding='utf-8') as f:
+                            f.write(anon_html[:5000])
+                        print(f"[DEBUG] Saved first 5000 chars to {debug_path}")
+                    except Exception:
+                        pass
+            except Exception as anon_e:
+                print(f"[DEBUG] Anonymous HTML fallback failed: {anon_e}")
+
+        # ── Parse HTML if we got a good page ──
+        if html:
+            try:
+                # Save debug HTML
+                try:
+                    debug_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'debug_instagram_response.html')
+                    with open(debug_path, 'w', encoding='utf-8') as f:
+                        f.write(html[:5000])
+                    print(f"[DEBUG] Saved first 5000 chars of HTML to {debug_path}")
+                except Exception:
+                    pass
+                
+                html_scrape_success = True
                 
                 # Extract user_id
                 id_match = re.search(r'"profile_id":"(\d+)"', html)
@@ -341,44 +422,96 @@ class InstagramService:
                 if id_match:
                     user_id = id_match.group(1)
                     print(f"[DEBUG] Found user_id from HTML: {user_id}")
+                else:
+                    print("[DEBUG] user_id NOT FOUND in HTML")
 
                 # Extract title for display name
                 title_match = re.search(r'<title>(.*?)\s*[\(\|@]', html)
                 if title_match:
                     display_name = title_match.group(1).strip()
+                    print(f"[DEBUG] Found display_name from title: {repr(display_name)}")
+                else:
+                    print("[DEBUG] display_name NOT FOUND in title")
 
-                # Extract profile picture URL from og:image
+                # Extract profile picture URL from og:image (try both attribute orderings)
                 pic_match = re.search(r'<meta\s+property="og:image"\s+content="(.*?)"', html)
+                if not pic_match:
+                    pic_match = re.search(r'<meta\s+content="(.*?)"\s+property="og:image"', html)
                 if pic_match:
                     profile_pic = pic_match.group(1).replace('&amp;', '&')
-                    print(f"[DEBUG] Found profile_pic from HTML: {profile_pic[:60]}...")
+                    print(f"[DEBUG] Found profile_pic from HTML: {profile_pic[:80]}...")
+                else:
+                    print("[DEBUG] profile_pic NOT FOUND in HTML")
 
+                # Extract counts from og:description (try both attribute orderings)
                 meta_match = re.search(r'<meta\s+property="og:description"\s+content="(.*?)"', html)
+                if not meta_match:
+                    meta_match = re.search(r'<meta\s+content="(.*?)"\s+property="og:description"', html)
+                
+                # Also try name="description" as a secondary source
+                if not meta_match:
+                    meta_match = re.search(r'<meta\s+name="description"\s+content="(.*?)"', html)
+                if not meta_match:
+                    meta_match = re.search(r'<meta\s+content="(.*?)"\s+name="description"', html)
+                    
                 if meta_match:
                     desc = meta_match.group(1)
-                    print(f"[DEBUG] Meta description: {desc[:120]}")
+                    print(f"[DEBUG] Meta description found: {desc[:200]}")
+                    
                     f_m = re.search(r'([\d,.]+[KMB]?)\s+Followers', desc, re.IGNORECASE)
                     if f_m:
                         followers_count = self._parse_count(f_m.group(1))
+                        print(f"[DEBUG] Followers extracted: {followers_count} (raw: {f_m.group(1)})")
+                    else:
+                        print("[DEBUG] Followers extraction FAILED from meta description")
+                        
                     fo_m = re.search(r'([\d,.]+[KMB]?)\s+Following', desc, re.IGNORECASE)
                     if fo_m:
                         following_count = self._parse_count(fo_m.group(1))
+                        print(f"[DEBUG] Following extracted: {following_count} (raw: {fo_m.group(1)})")
+                    else:
+                        print("[DEBUG] Following extraction FAILED from meta description")
+                        
                     p_m = re.search(r'([\d,.]+[KMB]?)\s+Posts', desc, re.IGNORECASE)
                     if p_m:
                         media_count = self._parse_count(p_m.group(1))
-        except Exception as e:
-            print(f"[DEBUG] HTML page fetch failed: {e}")
+                        print(f"[DEBUG] Posts extracted: {media_count} (raw: {p_m.group(1)})")
+                    else:
+                        print("[DEBUG] Posts extraction FAILED from meta description")
+                    
+                    # Extract bio from description (format: "NNN Followers, NNN Following, NNN Posts - See Instagram photos and videos from DisplayName (@username)")
+                    # Sometimes there's a bio snippet after the counts
+                    bio_match = re.search(r'Posts\s*[-\u2013]\s*(?:See Instagram photos and videos from\s+)?(?:.*?(?:\(@[^)]+\))?\s*)?[:\-\u2013]?\s*["\u201c]?(.*?)(?:["\u201d]?\s*$)', desc)
+                    if not bio_match:
+                        # Try to extract bio from separate meta tag
+                        bio_meta = re.search(r'"biography":"(.*?)"', html)
+                        if bio_meta:
+                            biography = bio_meta.group(1).encode().decode('unicode_escape', errors='ignore')
+                            print(f"[DEBUG] Biography from embedded JSON: {biography[:100]}")
+                else:
+                    print("[DEBUG] No meta description or og:description found in HTML")
+                    print("[DEBUG] HTML title tag content:", re.search(r'<title>(.*?)</title>', html).group(1) if re.search(r'<title>(.*?)</title>', html) else "N/A")
+            except Exception as parse_e:
+                print(f"[DEBUG] HTML parsing failed: {parse_e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print("[DEBUG] No usable HTML obtained from either authenticated or anonymous request")
 
         # ── Step 3: Try web_profile_info API for bio/category ──
         print("[STEP 3] Attempting to fetch rich profile metadata (web_profile_info API)...")
         try:
             time.sleep(1)
+            print(f"[DEBUG] Fetching web_profile_info for {repr(normalized_username)}")
             api_headers['Referer'] = f'https://www.instagram.com/{normalized_username}/'
-            api_resp = session.get(
-                f'https://www.instagram.com/api/v1/users/web_profile_info/?username={normalized_username}',
-                headers=api_headers
-            )
+            req_url = f'https://www.instagram.com/api/v1/users/web_profile_info/?username={normalized_username}'
+            api_resp = session.get(req_url, headers=api_headers)
+            print(f"[DEBUG] web_profile_info request URL: {req_url}")
+            print(f"[DEBUG] web_profile_info final URL: {api_resp.url}")
+            if api_resp.history:
+                print(f"[DEBUG] web_profile_info redirect chain: {[r.url for r in api_resp.history]}")
             print(f"[DEBUG] web_profile_info status: {api_resp.status_code}")
+            web_profile_status = api_resp.status_code
 
             if api_resp.status_code == 200:
                 api_data = api_resp.json()
@@ -403,6 +536,33 @@ class InstagramService:
                 print(f"[DEBUG] web_profile_info unavailable ({api_resp.status_code}), using meta tag data")
         except Exception as e:
             print(f"[DEBUG] web_profile_info API error: {e}")
+
+        # ── Step 3.5: Instaloader Fallback ──
+        if not html_scrape_success or web_profile_status == 429:
+            print("[STEP 3.5] Using Instaloader fallback due to HTML failure or 429 status...")
+            try:
+                print(f"[DEBUG] Instaloader Profile.from_username() called with exact string: {repr(normalized_username)}")
+                profile = instaloader.Profile.from_username(self.L.context, normalized_username)
+                
+                if profile.userid and not user_id:
+                    user_id = str(profile.userid)
+                if profile.followers > 0:
+                    followers_count = profile.followers
+                if profile.followees > 0:
+                    following_count = profile.followees
+                if profile.mediacount > 0:
+                    media_count = profile.mediacount
+                if profile.biography:
+                    biography = profile.biography
+                if profile.profile_pic_url:
+                    profile_pic = profile.profile_pic_url
+                if profile.full_name:
+                    display_name = profile.full_name
+                is_private = profile.is_private
+                
+                print(f"[DEBUG] Instaloader fallback successful. Followers: {followers_count}, Posts: {media_count}")
+            except Exception as e:
+                print(f"[DEBUG] Instaloader fallback failed: {e}")
 
         if is_private:
             raise ValueError("This account is private. Cannot analyze private profiles.")
@@ -436,6 +596,10 @@ class InstagramService:
                     if max_id:
                         url += f'&max_id={max_id}'
                     feed_resp = session.get(url, headers=api_headers)
+                    print(f"[DEBUG] Feed API request URL: {url}")
+                    print(f"[DEBUG] Feed API final URL: {feed_resp.url}")
+                    if feed_resp.history:
+                        print(f"[DEBUG] Feed API redirect chain: {[r.url for r in feed_resp.history]}")
                     print(f"[DEBUG] Feed API page {page+1} status: {feed_resp.status_code}")
 
                     if feed_resp.status_code != 200:
@@ -504,7 +668,7 @@ class InstagramService:
             # sort by likes to show top 3
             sorted_media = sorted(media_data, key=lambda x: x['like_count'], reverse=True)
             for i, p in enumerate(sorted_media[:3]):
-                cap = p['caption'][:40].replace('\n', ' ') if p['caption'] else '(no caption)'
+                cap = p['caption'][:40].replace('\n', ' ').encode('ascii', errors='replace').decode('ascii') if p['caption'] else '(no caption)'
                 print(f"    {i+1}. Likes: {p['like_count']} | Comments: {p['comments_count']} | Cap: {cap}...")
         print("==========================\n")
 

@@ -19,8 +19,15 @@ class UserModel {
   final List<String> interests;
   final String cameraConfidence;
   final DateTime? planExpiry;
+  final DateTime? proActivatedAt;
+  final String planName;
+  final String subscriptionId;
+  final String subscriptionStatus;
+  final DateTime? nextBillingDate;
   final DateTime createdAt;
   final List<String> completedQuests;
+
+  bool get hasActivePro => isPro && subscriptionStatus == 'active';
 
   UserModel({
     required this.uid,
@@ -41,6 +48,11 @@ class UserModel {
     this.interests = const [],
     this.cameraConfidence = '',
     this.planExpiry,
+    this.proActivatedAt,
+    this.planName = '',
+    this.subscriptionId = '',
+    this.subscriptionStatus = '',
+    this.nextBillingDate,
     DateTime? createdAt,
     this.completedQuests = const [],
   }) : createdAt = createdAt ?? DateTime.now();
@@ -69,6 +81,15 @@ class UserModel {
       planExpiry: map['planExpiry'] != null
           ? DateTime.tryParse(map['planExpiry'] as String)
           : null,
+      proActivatedAt: map['proActivatedAt'] != null
+          ? DateTime.tryParse(map['proActivatedAt'] as String)
+          : null,
+      planName: map['planName'] ?? '',
+      subscriptionId: map['subscriptionId'] ?? '',
+      subscriptionStatus: map['subscriptionStatus'] ?? '',
+      nextBillingDate: map['nextBillingDate'] != null
+          ? DateTime.tryParse(map['nextBillingDate'] as String)
+          : null,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -96,6 +117,11 @@ class UserModel {
       'interests': interests,
       'cameraConfidence': cameraConfidence,
       'planExpiry': planExpiry?.toIso8601String(),
+      'proActivatedAt': proActivatedAt?.toIso8601String(),
+      'planName': planName,
+      'subscriptionId': subscriptionId,
+      'subscriptionStatus': subscriptionStatus,
+      'nextBillingDate': nextBillingDate?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'completedQuests': completedQuests,
     };
@@ -120,6 +146,11 @@ class UserModel {
     List<String>? interests,
     String? cameraConfidence,
     DateTime? planExpiry,
+    DateTime? proActivatedAt,
+    String? planName,
+    String? subscriptionId,
+    String? subscriptionStatus,
+    DateTime? nextBillingDate,
     List<String>? completedQuests,
   }) {
     return UserModel(
@@ -141,6 +172,11 @@ class UserModel {
       interests: interests ?? this.interests,
       cameraConfidence: cameraConfidence ?? this.cameraConfidence,
       planExpiry: planExpiry ?? this.planExpiry,
+      proActivatedAt: proActivatedAt ?? this.proActivatedAt,
+      planName: planName ?? this.planName,
+      subscriptionId: subscriptionId ?? this.subscriptionId,
+      subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+      nextBillingDate: nextBillingDate ?? this.nextBillingDate,
       createdAt: createdAt,
       completedQuests: completedQuests ?? this.completedQuests,
     );

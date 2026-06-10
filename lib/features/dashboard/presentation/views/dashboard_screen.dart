@@ -46,6 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
+    debugPrint("Dashboard loaded profile data: handle=${user.instagramHandle}, niche=${user.niche}, followers=${user.followersCount}");
+
     final List<Widget> tabs = [
       DashboardHomeView(
         user: user,

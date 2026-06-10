@@ -18,6 +18,7 @@ import '../../features/instagram/presentation/views/instagram_library_view.dart'
 import '../../features/instagram/presentation/views/instagram_username_analysis_screen.dart';
 import '../../features/onboarding/views/onboarding_screen.dart';
 import '../../features/reports/presentation/views/creator_report_screen.dart';
+import '../../features/payments/presentation/views/pricing_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -138,6 +139,12 @@ class AppRouter {
         path: '/instagram',
         builder: (BuildContext context, GoRouterState state) {
           return const InstagramLibraryView();
+        },
+      ),
+      GoRoute(
+        path: '/pricing',
+        builder: (BuildContext context, GoRouterState state) {
+          return const PricingScreen();
         },
       ),
     ],

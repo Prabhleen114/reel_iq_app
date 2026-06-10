@@ -14,13 +14,13 @@ class PublicInstagramService {
   static String _getBaseUrl() {
     if (kIsWeb) return 'http://127.0.0.1:8000';
     if (Platform.isAndroid) {
-      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.0.119:8000';
+      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
     }
     return 'http://127.0.0.1:8000';
   }
 
   /// Analyze a public profile with caching logic
-  Future<PublicProfileAnalysisModel> analyzeProfile(String userId, String rawUsername) async {
+  Future<PublicProfileAnalysisModel> analyzeProfile(String userId, String rawUsername, {bool forceRefresh = true}) async {
     // 1. Normalize username
     final username = rawUsername.trim().replaceAll('@', '').toLowerCase();
     if (username.isEmpty) {
@@ -28,24 +28,42 @@ class PublicInstagramService {
     }
 
     // 2. Check cache (within last 24 hours)
-    final cacheRef = await _firestore
-        .collection('public_profile_analysis')
-        .where('searchedUsername', isEqualTo: username)
-        .get();
+    if (!forceRefresh) {
+      final cacheRef = await _firestore
+          .collection('public_profile_analysis')
+          .where('searchedUsername', isEqualTo: username)
+          .get();
 
-    if (cacheRef.docs.isNotEmpty) {
-      final models = cacheRef.docs
-          .map((doc) => PublicProfileAnalysisModel.fromMap(doc.data(), doc.id))
-          .toList();
-          
-      // Sort in-memory to avoid requiring composite index
-      models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      
-      final cachedModel = models.first;
-      
-      final cacheAge = DateTime.now().difference(cachedModel.createdAt);
-      if (cacheAge.inHours < 24) {
-        return cachedModel;
+      if (cacheRef.docs.isNotEmpty) {
+        final models = cacheRef.docs
+            .map((doc) => PublicProfileAnalysisModel.fromMap(doc.data(), doc.id))
+            .toList();
+            
+        // Sort in-memory to avoid requiring composite index
+        models.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        
+        final cachedModel = models.first;
+        
+        final cacheAge = DateTime.now().difference(cachedModel.createdAt);
+        if (cacheAge.inHours < 24) {
+          debugPrint("Returning cached profile analysis for $username (age: ${cacheAge.inHours}h)");
+          return cachedModel;
+        }
+      }
+    } else {
+      debugPrint("Cache bypassed for $username (forceRefresh=true)");
+      // Delete old cached documents for this username to ensure clean state
+      try {
+        final oldCache = await _firestore
+            .collection('public_profile_analysis')
+            .where('searchedUsername', isEqualTo: username)
+            .get();
+        for (var doc in oldCache.docs) {
+          await doc.reference.delete();
+        }
+        debugPrint("Deleted ${oldCache.docs.length} old cached documents for $username");
+      } catch (e) {
+        debugPrint("Failed to delete old cache: $e");
       }
     }
 
@@ -53,12 +71,15 @@ class PublicInstagramService {
     final baseUrl = _getBaseUrl();
     try {
       final uri = Uri.parse('$baseUrl/instagram/public-profile-analysis');
+      debugPrint("Calling public profile analysis for $username");
       debugPrint('[API REQUEST] $uri');
       final response = await http.post(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'username': username}),
       ).timeout(const Duration(seconds: 45)); // Give backend time to scrape and run groq
+
+      debugPrint("Profile analysis response: ${response.statusCode} - ${response.body}");
 
       if (response.statusCode != 200) {
         final error = json.decode(response.body);

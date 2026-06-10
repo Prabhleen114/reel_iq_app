@@ -186,11 +186,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
 
               // Subscription Status Plan Card
-              _buildSubscriptionCard(profileVM),
+              _buildSubscriptionCard(profileVM, isPro: authVM.user?.hasActivePro ?? false),
               const SizedBox(height: 20),
 
               // Weekly Creator Report (Concept B / Pro Requirement)
-              _buildWeeklyCreatorReport(profileVM),
+              _buildWeeklyCreatorReport(profileVM, isPro: authVM.user?.hasActivePro ?? false),
               const SizedBox(height: 20),
 
               // Usage statistics
@@ -210,16 +210,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _buildUsageRow(
                       'Reels Audited',
-                      profileVM.isPro 
+                      (authVM.user?.hasActivePro ?? false)
                           ? '${profileVM.analysesPerformed} / Unlimited' 
                           : '${profileVM.analysesPerformed} / ${profileVM.maxFreeAnalyses}',
-                      profileVM.isPro ? 1.0 : (profileVM.analysesPerformed / profileVM.maxFreeAnalyses).clamp(0.0, 1.0),
+                      (authVM.user?.hasActivePro ?? false) ? 1.0 : (profileVM.analysesPerformed / profileVM.maxFreeAnalyses).clamp(0.0, 1.0),
                     ),
                     const SizedBox(height: 16),
                     _buildUsageRow(
                       'Content Calendars Generated',
-                      profileVM.isPro ? 'Unlimited' : '${dashboardVM.totalReelsAnalyzed > 0 ? 1 : 0} / 2 Plans',
-                      profileVM.isPro ? 1.0 : 0.5,
+                      (authVM.user?.hasActivePro ?? false) ? 'Unlimited' : '${dashboardVM.totalReelsAnalyzed > 0 ? 1 : 0} / 2 Plans',
+                      (authVM.user?.hasActivePro ?? false) ? 1.0 : 0.5,
                     ),
                   ],
                 ),
@@ -302,13 +302,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSubscriptionCard(ProfileViewModel profileVM) {
+  Widget _buildSubscriptionCard(ProfileViewModel profileVM, {required bool isPro}) {
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.cardBackground,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: profileVM.isPro ? AppTheme.accent.withOpacity(0.3) : Colors.white.withOpacity(0.04),
+          color: isPro ? AppTheme.accent.withOpacity(0.3) : Colors.white.withOpacity(0.04),
         ),
       ),
       padding: const EdgeInsets.all(20),
@@ -324,9 +324,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   const Text('MEMBERSHIP PLAN', style: TextStyle(color: AppTheme.textMuted, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1.0)),
                   const SizedBox(height: 4),
                   Text(
-                    profileVM.isPro ? 'Pro Creator Plan' : 'Free Sandbox Tier',
+                    isPro ? 'Pro Creator Plan' : 'Free Sandbox Tier',
                     style: TextStyle(
-                      color: profileVM.isPro ? AppTheme.accent : AppTheme.textPrimary,
+                      color: isPro ? AppTheme.accent : AppTheme.textPrimary,
                       fontSize: 18,
                       fontWeight: FontWeight.w900,
                     ),
@@ -336,13 +336,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: profileVM.isPro ? AppTheme.accent.withOpacity(0.12) : Colors.white.withOpacity(0.04),
+                  color: isPro ? AppTheme.accent.withOpacity(0.12) : Colors.white.withOpacity(0.04),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  profileVM.isPro ? 'ACTIVE' : 'FREE',
+                  isPro ? 'ACTIVE' : 'FREE',
                   style: TextStyle(
-                    color: profileVM.isPro ? AppTheme.accent : AppTheme.textSecondary,
+                    color: isPro ? AppTheme.accent : AppTheme.textSecondary,
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
                   ),
@@ -352,22 +352,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            profileVM.isPro
+            isPro
                 ? 'Enjoy unlimited analysis audits, rewrites, dynamic calendars, and premium weekly creator reports.'
                 : 'Free tier limits your account to 5 video audits per month.',
             style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () => profileVM.toggleSubscription(),
+            onPressed: () {
+              if (!isPro) {
+                context.push('/pricing');
+              }
+            },
             style: ElevatedButton.styleFrom(
-              backgroundColor: profileVM.isPro ? Colors.white.withOpacity(0.06) : AppTheme.accent,
-              foregroundColor: profileVM.isPro ? AppTheme.textPrimary : Colors.white,
+              backgroundColor: isPro ? Colors.white.withOpacity(0.06) : AppTheme.accent,
+              foregroundColor: isPro ? AppTheme.textPrimary : Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(
-              profileVM.isPro ? 'Switch to Free Tier' : 'Upgrade to Pro — ₹199/month',
+              isPro ? 'Subscription Active' : 'Upgrade to Pro — ₹199/month',
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
@@ -376,8 +380,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildWeeklyCreatorReport(ProfileViewModel profileVM) {
-    if (!profileVM.isPro) {
+  Widget _buildWeeklyCreatorReport(ProfileViewModel profileVM, {required bool isPro}) {
+    if (!isPro) {
       return Container(
         decoration: BoxDecoration(
           color: AppTheme.cardBackground.withOpacity(0.6),

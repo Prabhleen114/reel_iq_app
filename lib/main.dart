@@ -13,6 +13,10 @@ import 'core/theme/app_theme.dart';
 
 // ViewModels
 import 'features/auth/presentation/viewmodels/auth_viewmodel.dart';
+import 'features/onboarding/viewmodels/onboarding_viewmodel.dart';
+import 'features/reports/presentation/viewmodels/report_viewmodel.dart';
+import 'features/payments/data/services/payment_service.dart';
+import 'features/payments/presentation/viewmodels/payment_viewmodel.dart';
 import 'features/dashboard/presentation/viewmodels/dashboard_viewmodel.dart';
 import 'features/analysis/presentation/viewmodels/analysis_viewmodel.dart';
 import 'features/reel_upload/presentation/viewmodels/upload_viewmodel.dart';
@@ -76,6 +80,7 @@ void main() async {
   final reelAnalysisService = RealReelAnalysisService(apiService);
   final creatorAnalysisService = RealCreatorAnalysisService(instagramOAuthService);
   final plannerApiService = PlannerApiService();
+  final paymentApiService = PaymentApiService();
 
   runApp(
     MultiProvider(
@@ -137,7 +142,11 @@ void main() async {
           ),
         ),
         ChangeNotifierProvider<PublicProfileViewModel>(
-          create: (context) => PublicProfileViewModel(),
+          create: (context) => PublicProfileViewModel(instagramService),
+        ),
+        Provider<PaymentApiService>.value(value: paymentApiService),
+        ChangeNotifierProvider<PaymentViewModel>(
+          create: (context) => PaymentViewModel(paymentApiService, firestoreService),
         ),
       ],
       child: const ReelIQApp(),

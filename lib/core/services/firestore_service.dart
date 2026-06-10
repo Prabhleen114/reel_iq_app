@@ -211,6 +211,40 @@ class FirestoreService {
   }
 
   // ─────────────────────────────────────────────
+  // PAYMENTS
+  // ─────────────────────────────────────────────
+
+  Future<void> savePaymentRecord(String paymentId, Map<String, dynamic> paymentData) async {
+    if (!_isLive) return;
+    try {
+      await _db
+          .collection('payments')
+          .doc(paymentId)
+          .set(paymentData);
+    } catch (e) {
+      debugPrint('FirestoreService.savePaymentRecord error: $e');
+    }
+  }
+
+  Future<void> activateProStatus(String uid, {
+    required String subscriptionId,
+    required String planName,
+  }) async {
+    if (!_isLive) return;
+    try {
+      await _db.collection('users').doc(uid).update({
+        'isPro': true,
+        'proActivatedAt': DateTime.now().toIso8601String(),
+        'planName': planName,
+        'subscriptionId': subscriptionId,
+        'subscriptionStatus': 'active',
+      });
+    } catch (e) {
+      debugPrint('FirestoreService.activateProStatus error: $e');
+    }
+  }
+
+  // ─────────────────────────────────────────────
   // CREATOR REPORTS
   // ─────────────────────────────────────────────
 

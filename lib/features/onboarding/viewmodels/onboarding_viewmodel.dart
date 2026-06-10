@@ -62,24 +62,29 @@ class OnboardingViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
+      debugPrint("Before analyzeProfile() - Calling for $_handle");
       final result = await _instagramService.analyzeProfile(userId, _handle);
+      debugPrint("After analyzeProfile() - Received response");
       
       final snap = result.profileSnapshot;
       final ai = result.aiAnalysis;
       
-      _profilePictureUrl = snap['profilePictureUrl'] ?? '';
-      _followersCount = snap['followersCount'] ?? 0;
-      _engagementRate = (snap['engagementRate'] ?? 0.0).toDouble();
-      _displayName = snap['fullName'] ?? snap['username'] ?? _handle;
+      _profilePictureUrl = snap['profile_picture_url'] ?? snap['profilePictureUrl'] ?? '';
+      _followersCount = snap['followers_count'] ?? snap['followersCount'] ?? 0;
+      _engagementRate = (snap['engagement_rate'] ?? snap['engagementRate'] ?? 0.0).toDouble();
+      _displayName = snap['display_name'] ?? snap['fullName'] ?? snap['username'] ?? _handle;
 
       _niche = ai['niche'] ?? '';
       _audiencePersona = ai['audiencePersona'] ?? '';
+
+      debugPrint("Extracted values: followersCount=$_followersCount, followingCount=${snap['follows_count'] ?? snap['followingCount']}, mediaCount=${snap['media_count'] ?? snap['mediaCount']}, engagementRate=$_engagementRate, niche=$_niche");
 
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (e) {
       _error = e.toString().replaceAll('Exception: ', '');
+      debugPrint("Error in analyzeProfile: $_error");
       _isLoading = false;
       notifyListeners();
       return false;
@@ -106,7 +111,9 @@ class OnboardingViewModel extends ChangeNotifier {
         onboardingCompleted: true,
       );
 
+      debugPrint("Before saveUser() - Payload: ${updatedUser.toMap()}");
       await _firestoreService.saveUser(updatedUser);
+      debugPrint("After saveUser() - Completed");
       // We don't have a direct setter in AuthViewModel, but authStateChanges will pick it up or we can just let GoRouter handle it after it saves to firestore.
       // However, we should probably update the local authViewModel state if possible, but AuthViewModel's user is a getter.
       // GoRouter redirect will run when auth state changes if we use a stream, but AuthViewModel might not trigger notifyListeners.
