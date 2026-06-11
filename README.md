@@ -1,76 +1,108 @@
 # ReelIQ
 
-ReelIQ is an AI-powered Instagram Reel optimization platform designed to maximize viewer engagement, rating hook effectiveness, predicting retention profiles, and detailing specific structural recommendations. Built with **Flutter**, **Dart**, and **Material 3**.
+ReelIQ is a comprehensive, AI-powered Instagram Reel optimization platform built with Flutter and Dart. It is designed to maximize viewer engagement, predict retention profiles, analyze and score hooks, and offer customized structural recommendations. ReelIQ uses Material 3 to provide a sleek, modern, and dark-themed user experience.
 
-## Features Overview
+## Comprehensive Features
 
-1. **Authentication Gate**: Simple Email Login, Email Sign-up, and native Google Login integration.
-2. **Dynamic Dashboard Tracker**: Monitor total processed reels, average engagement score trends, and a scrollable log of prior AI scans.
-3. **Interactive Upload Sandbox**: Select video clips directly from the local gallery, play back selections in an integrated viewer, and start the AI metric calculations.
-4. **Detailed AI Feedback reports**: View the calculated viral score out of 100 on an interactive visual gauge, read linguistic grade outputs, and list customized pacing suggestions.
-5. **Hook A/B Testing Lab**: Type in three custom Hook variations, run linguistic analysis simulations, compare score breakdowns side-by-side, and identify the winning hook.
-6. **Creator Profile**: View personal user telemetry, toggle the offline fallback database, and exit the session.
+### 1. Authentication & Onboarding
+- **Gatekeeper Auth:** Secure login and sign-up flows using Firebase Auth. Supports both standard Email/Password authentication and Google Sign-in.
+- **Onboarding Flow:** An intuitive onboarding sequence for new users to set up their profiles and understand the core features.
+
+### 2. Dashboard & Analytics
+- **Dynamic Dashboard Tracker:** A centralized hub to monitor total processed reels, track average engagement score trends, and access a scrollable log of prior AI scans.
+- **Reports:** Detailed, structured reports of historic uploads and their respective engagement predictions.
+
+### 3. Media Upload & Processing
+- **Interactive Upload Sandbox:** Select video clips directly from the local device gallery using Image Picker.
+- **Integrated Video Player:** Play back video selections right within the app before initiating the AI metric calculations.
+
+### 4. AI Feedback & Analysis
+- **Detailed AI Feedback:** View calculated viral scores out of 100 on interactive visual gauges.
+- **Linguistic Grading:** Receive text-based feedback and custom pacing suggestions.
+
+### 5. Hook A/B Testing Lab
+- **Multi-Concept Testing:** Input three custom hook variations simultaneously.
+- **Simulations:** Run linguistic analysis simulations to compare score breakdowns side-by-side and confidently identify the most effective hook before publishing.
+
+### 6. Integrations & Payments
+- **Instagram Integration:** Seamless features built to specifically optimize the Instagram reels algorithm.
+- **Payments & Subscriptions:** In-App Purchases and Razorpay integration to handle premium features and tiered subscriptions.
+
+### 7. User Profile Management
+- **Creator Profile:** View personal user telemetry, manage account settings, and access support features through embedded webviews and URL launchers.
 
 ---
 
-## Tech Stack & Libraries
+## Technology Stack & Dependencies
 
-- **Frontend**: Flutter & Dart (Material 3 Dark Theme)
-- **State Management & DI**: `provider` (MVVM architecture binding)
-- **Routing**: `go_router` (declares nested path and parameter routes)
-- **Media**: `image_picker` (video galleries selection), `video_player` (integrated video playback)
-- **Design Typography**: `google_fonts` (Outfit typography family)
-- **Backend Integrations**:
-  - `firebase_core` (Core initialization)
-  - `firebase_auth` (Sign-in and accounts storage)
-  - `cloud_firestore` (Data persistence for analytics logs)
-  - `firebase_storage` (Video hosting and asset endpoints)
-  - `google_sign_in` (Google provider authentication)
+**Core framework:**
+- Flutter & Dart
+- Material 3 Design
+
+**State Management & Architecture:**
+- `provider` (MVVM architecture binding)
+- `go_router` (Advanced declarative routing, nested paths, and parameters)
+
+**Media & UI:**
+- `image_picker` (Video and gallery selection)
+- `video_player` (Integrated video playback)
+- `google_fonts` (Outfit typography family)
+- `cupertino_icons` (iOS-style icon sets)
+
+**Backend Integrations (Firebase):**
+- `firebase_core` (Initialization)
+- `firebase_auth` & `google_sign_in` (Authentication)
+- `cloud_firestore` (Data persistence and logs)
+- `firebase_storage` (Video hosting and asset endpoints)
+- `firebase_analytics` & `firebase_crashlytics` (Telemetry and crash reporting)
+
+**Utility & Monetization:**
+- `http` (Network requests)
+- `shared_preferences` (Local key-value storage)
+- `in_app_purchase` & `razorpay_flutter` (Monetization gateways)
+- `webview_flutter` & `url_launcher` (Web and external link handling)
 
 ---
 
-## Architecture Layout (Clean MVVM)
+## Clean Architecture (MVVM)
 
 The project utilizes a feature-first clean folder structure separating concerns between data layers, business logic controllers, and views:
 
-```
+```text
 lib/
 ├── core/
-│   ├── navigation/        # GoRouter routes and redirect structures (app_router.dart)
-│   ├── services/          # Global configs and mock toggle rules (mock_config.dart)
-│   ├── theme/             # Palette gradients, shapes, and theme configuration (app_theme.dart)
-│   └── widgets/           # Global reusable UI parts (glass_card.dart)
+│   ├── navigation/        # GoRouter routes and redirect structures
+│   ├── services/          # Global configurations and services
+│   ├── theme/             # Palette gradients, shapes, and Material 3 theme configuration
+│   └── widgets/           # Global reusable UI parts
 │
 └── features/
-    ├── auth/              # Account signups, google log-ins, and session caching
-    ├── dashboard/         # Metrics counters and list logs
-    ├── reel_upload/       # Picker triggers, upload progress, and previews
     ├── analysis/          # Dynamic scoring gauges and improvement items
-    └── hook_testing/      # Multi-concept A/B testing forms and winner cards
-        ├── data/
-        │   ├── models/        # Plain data structures (models)
-        │   └── repositories/  # Backend fetching rules (live vs mock)
-        └── presentation/
-            ├── viewmodels/    # Notifiers binding view events to datasets
-            └── views/         # Beautiful responsive dark layouts (screens)
+    ├── auth/              # Account signups, Google log-ins, session caching
+    ├── dashboard/         # Metrics counters and historic logs
+    ├── hook_testing/      # Multi-concept A/B testing forms and winner cards
+    ├── instagram/         # Instagram-specific optimization models
+    ├── onboarding/        # Initial app walk-through and user setup
+    ├── payments/          # Razorpay and In-App Purchase screens and logic
+    ├── profile/           # User telemetry and settings
+    ├── reel_upload/       # Picker triggers, upload progress, and previews
+    └── reports/           # Detailed aggregated analytics output
 ```
 
 ---
 
-## Dynamic Backend Configurations (Offline Mock Mode)
+## Backend Configurations
 
-ReelIQ features a robust **Mock Mode** enabled by default. If platform-specific configuration files (`google-services.json` on Android or `GoogleService-Info.plist` on iOS) are not present at runtime, the application will catch the initialization exception, notify the debugging terminal, and seamlessly spin up local in-memory mock databases and AI engine simulators.
-
-### To Connect Your Live Firebase Backend:
+### Connecting a Live Firebase Backend:
 
 1. **Create a project** in the Firebase console.
-2. **Register apps** for Android and iOS.
-3. **Download and drop configuration files**:
+2. **Register apps** for both Android and iOS.
+3. **Download Configuration Files**:
    - For Android: Place `google-services.json` inside the `android/app/` folder.
    - For iOS: Place `GoogleService-Info.plist` inside the `ios/Runner/` folder using Xcode.
-4. **Enable Auth methods**: Email/Password and Google Sign-in.
-5. **Set up Firestore collections**: Create a `reels` collection.
-6. **Set up Storage buckets**: Allow reading/writing to `reels/`.
+4. **Enable Authentication Methods**: Email/Password and Google Sign-in.
+5. **Setup Firestore**: Create a `reels` collection with appropriate read/write security rules.
+6. **Setup Storage**: Allow reading and writing access to the `reels/` bucket.
 
 ---
 
@@ -78,15 +110,20 @@ ReelIQ features a robust **Mock Mode** enabled by default. If platform-specific 
 
 To run locally on a connected emulator, simulator, or desktop target:
 
-1. Fetch and configure all dependency packages:
+1. **Install Dependencies:**
+   Fetch and configure all required packages:
    ```bash
    flutter pub get
    ```
-2. Check for linting, type errors, or warnings:
+
+2. **Code Quality Checks:**
+   Check for linting, type errors, or warnings based on the predefined `analysis_options.yaml`:
    ```bash
    flutter analyze
    ```
-3. Run target build:
+
+3. **Run Application:**
+   Compile and run the target build:
    ```bash
    flutter run
    ```
