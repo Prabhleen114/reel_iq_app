@@ -109,7 +109,7 @@ class PaymentViewModel extends ChangeNotifier {
     try {
       // Step 3: Verify signature on backend
       final verifyResult = await _paymentApiService.verifySubscription(
-        subscriptionId: response.subscriptionId ?? _currentSubscriptionId,
+        subscriptionId: _currentSubscriptionId,
         paymentId: response.paymentId ?? '',
         signature: response.signature ?? '',
         userId: _currentUserId,
@@ -124,7 +124,7 @@ class PaymentViewModel extends ChangeNotifier {
           {
             'userId': _currentUserId,
             'paymentId': response.paymentId ?? '',
-            'subscriptionId': response.subscriptionId ?? _currentSubscriptionId,
+            'subscriptionId': _currentSubscriptionId,
             'signature': response.signature ?? '',
             'planName': 'ReelIQ Pro',
             'status': 'captured',
@@ -135,7 +135,7 @@ class PaymentViewModel extends ChangeNotifier {
         // Step 5: Update user Pro status
         await _firestoreService.activateProStatus(
           _currentUserId,
-          subscriptionId: response.subscriptionId ?? _currentSubscriptionId,
+          subscriptionId: _currentSubscriptionId,
           planName: 'ReelIQ Pro',
         );
 

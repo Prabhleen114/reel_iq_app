@@ -186,11 +186,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
 
               // Subscription Status Plan Card
-              _buildSubscriptionCard(profileVM, isPro: authVM.user?.hasActivePro ?? false),
+              _buildSubscriptionCard(profileVM, isPro: authViewModel.user?.hasActivePro ?? false),
               const SizedBox(height: 20),
 
               // Weekly Creator Report (Concept B / Pro Requirement)
-              _buildWeeklyCreatorReport(profileVM, isPro: authVM.user?.hasActivePro ?? false),
+              _buildWeeklyCreatorReport(profileVM, isPro: authViewModel.user?.hasActivePro ?? false),
               const SizedBox(height: 20),
 
               // Usage statistics
@@ -210,16 +210,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _buildUsageRow(
                       'Reels Audited',
-                      (authVM.user?.hasActivePro ?? false)
+                      (authViewModel.user?.hasActivePro ?? false)
                           ? '${profileVM.analysesPerformed} / Unlimited' 
                           : '${profileVM.analysesPerformed} / ${profileVM.maxFreeAnalyses}',
-                      (authVM.user?.hasActivePro ?? false) ? 1.0 : (profileVM.analysesPerformed / profileVM.maxFreeAnalyses).clamp(0.0, 1.0),
+                      (authViewModel.user?.hasActivePro ?? false) ? 1.0 : (profileVM.analysesPerformed / profileVM.maxFreeAnalyses).clamp(0.0, 1.0),
                     ),
                     const SizedBox(height: 16),
                     _buildUsageRow(
                       'Content Calendars Generated',
-                      (authVM.user?.hasActivePro ?? false) ? 'Unlimited' : '${dashboardVM.totalReelsAnalyzed > 0 ? 1 : 0} / 2 Plans',
-                      (authVM.user?.hasActivePro ?? false) ? 1.0 : 0.5,
+                      (authViewModel.user?.hasActivePro ?? false) ? 'Unlimited' : '${dashboardVM.totalReelsAnalyzed > 0 ? 1 : 0} / 2 Plans',
+                      (authViewModel.user?.hasActivePro ?? false) ? 1.0 : 0.5,
                     ),
                   ],
                 ),
