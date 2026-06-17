@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
+import '../../../auth/data/repositories/auth_repository.dart';
 import '../viewmodels/profile_viewmodel.dart';
 import '../../../dashboard/presentation/viewmodels/dashboard_viewmodel.dart';
 
@@ -276,6 +277,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 icon: const Icon(Icons.logout_rounded, size: 18),
                 label: const Text('Log Out Session', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              ),
+              const SizedBox(height: 16),
+              
+              // Delete Account Button (Required for Play Store Compliance)
+              TextButton.icon(
+                onPressed: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      backgroundColor: AppTheme.cardBackground,
+                      title: const Text('Delete Account', style: TextStyle(color: AppTheme.error)),
+                      content: const Text(
+                        'This action is irreversible. All your data, analyses, and history will be permanently deleted. Are you absolutely sure?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Delete My Account', style: TextStyle(color: AppTheme.error)),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirm == true && mounted) {
+                    final authRepo = Provider.of<AuthRepository>(context, listen: false);
+                    await authRepo.deleteAccount();
+                    if (mounted) {
+                      context.go('/login');
+                    }
+                  }
+                },
+                icon: const Icon(Icons.delete_forever_rounded, size: 18, color: AppTheme.error),
+                label: const Text('Delete Account', style: TextStyle(color: AppTheme.error)),
               ),
             ],
           ),

@@ -2,24 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../../../../core/config/env_config.dart';
 import '../models/analysis_models.dart';
 
 class AnalysisApiService {
   final String baseUrl;
 
-  // Set this to true if testing on Android Emulator, false if testing on physical Android device
-  static const bool _isEmulator = false;
-
-  static String _getBaseUrl() {
-    if (kIsWeb) return 'http://127.0.0.1:8000';
-    if (Platform.isAndroid) {
-      return _isEmulator ? 'http://10.0.2.2:8000' : 'http://192.168.29.25:8000';
-    }
-    return 'http://127.0.0.1:8000';
-  }
-
-  AnalysisApiService({String? baseUrl}) : baseUrl = baseUrl ?? _getBaseUrl() {
-    debugPrint('ReelIQ AnalysisApiService: Targeting backend at → ${baseUrl ?? _getBaseUrl()}');
+  AnalysisApiService({String? baseUrl}) : baseUrl = baseUrl ?? EnvConfig.baseUrl {
+    debugPrint('ReelIQ AnalysisApiService: Targeting backend at → ${baseUrl ?? EnvConfig.baseUrl}');
   }
 
   /// Uploads video to FastAPI backend for frame extraction, Whisper transcription,

@@ -258,4 +258,29 @@ class AuthRepository {
       } catch (_) {}
     }
   }
+  // ─── Account Deletion ───────────────────────────────────────────────────
+
+  Future<void> deleteAccount() async {
+    if (MockConfig.useMockMode) {
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (_currentMockUser != null) {
+        _mockUsers.removeWhere((u) => u.uid == _currentMockUser!.uid);
+        _currentMockUser = null;
+      }
+      return;
+    }
+
+    final user = _auth.currentUser;
+    if (user != null) {
+      // Step 1: Delete all user data from Firestore
+      await _firestoreService.deleteUserData(user.uid);
+      
+      // Step 2: Delete the Firebase Auth user
+      await user.delete();
+
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
+    }
+  }
 }

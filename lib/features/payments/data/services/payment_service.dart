@@ -3,14 +3,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../../../../core/config/env_config.dart';
+
 class PaymentApiService {
   /// Detects backend base URL (same pattern as other services in this app)
   String _getBaseUrl() {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
-    } else {
-      return 'http://127.0.0.1:8000';
-    }
+    return EnvConfig.baseUrl;
   }
 
   /// Creates a Razorpay subscription via the backend
@@ -37,23 +35,21 @@ class PaymentApiService {
     }
   }
 
-  /// Verifies subscription signature via the backend
+  /// Verifies subscription Google Play purchase token via the backend
   Future<Map<String, dynamic>> verifySubscription({
-    required String subscriptionId,
-    required String paymentId,
-    required String signature,
+    required String purchaseToken,
+    required String productId,
     required String userId,
   }) async {
-    final url = '${_getBaseUrl()}/payments/verify-subscription';
+    final url = '${_getBaseUrl()}/payments/verify-google-play';
     debugPrint('[PaymentApiService] Verifying subscription: $url');
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'subscription_id': subscriptionId,
-        'payment_id': paymentId,
-        'signature': signature,
+        'purchase_token': purchaseToken,
+        'product_id': productId,
         'user_id': userId,
       }),
     );

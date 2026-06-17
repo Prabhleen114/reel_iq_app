@@ -50,6 +50,18 @@ class FirestoreService {
     }
   }
 
+  Future<void> deleteUserData(String uid) async {
+    if (!_isLive) return;
+    try {
+      // In a real app, you might want to call a Firebase Cloud Function 
+      // to cleanly delete all subcollections (analyses, calendars, etc.)
+      await _db.collection('users').doc(uid).delete();
+    } catch (e) {
+      debugPrint('FirestoreService.deleteUserData error: $e');
+      throw Exception('Failed to delete user data');
+    }
+  }
+
   // ─────────────────────────────────────────────
   // ANALYSES
   // ─────────────────────────────────────────────

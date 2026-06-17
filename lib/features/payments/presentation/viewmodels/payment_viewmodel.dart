@@ -1,5 +1,6 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../data/services/payment_service.dart';
@@ -9,8 +10,13 @@ enum PaymentStatus { idle, creatingOrder, processingPayment, verifying, success,
 class PaymentViewModel extends ChangeNotifier {
   final PaymentApiService _paymentApiService;
   final FirestoreService _firestoreService;
+  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
 
-  PaymentViewModel(this._paymentApiService, this._firestoreService);
+  late StreamSubscription<List<PurchaseDetails>> _subscription;
+
+  PaymentViewModel(this._paymentApiService, this._firestoreService) {
+    _initIAP();
+  }
 
   PaymentStatus _status = PaymentStatus.idle;
   PaymentStatus get status => _status;
@@ -21,29 +27,41 @@ class PaymentViewModel extends ChangeNotifier {
   String _successPaymentId = '';
   String get successPaymentId => _successPaymentId;
 
-  // Razorpay instance
-  Razorpay? _razorpay;
-  String _currentSubscriptionId = '';
   String _currentUserId = '';
-  String _currentKeyId = '';
-  String _currentUserEmail = '';
-  String _currentUserName = '';
-  String _currentUserPhone = '';
+  static const String _productId = 'reeliq_pro_monthly';
 
-  /// Initialize Razorpay listeners
-  void initRazorpay() {
-    _razorpay = Razorpay();
-    _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  void _initIAP() {
+    final Stream<List<PurchaseDetails>> purchaseUpdated = _inAppPurchase.purchaseStream;
+    _subscription = purchaseUpdated.listen((purchaseDetailsList) {
+      _listenToPurchaseUpdated(purchaseDetailsList);
+    }, onDone: () {
+      _subscription.cancel();
+    }, onError: (error) {
+      _status = PaymentStatus.failed;
+      _errorMessage = 'In-App Purchase failed to initialize: $error';
+      notifyListeners();
+    });
   }
 
-  /// Dispose Razorpay listeners
-  void disposeRazorpay() {
-    _razorpay?.clear();
+  void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
+    for (var purchaseDetails in purchaseDetailsList) {
+      if (purchaseDetails.status == PurchaseStatus.pending) {
+        _status = PaymentStatus.processingPayment;
+        notifyListeners();
+      } else {
+        if (purchaseDetails.status == PurchaseStatus.error) {
+          _handlePaymentError(purchaseDetails.error!);
+        } else if (purchaseDetails.status == PurchaseStatus.purchased ||
+            purchaseDetails.status == PurchaseStatus.restored) {
+          _handlePaymentSuccess(purchaseDetails);
+        }
+        if (purchaseDetails.pendingCompletePurchase) {
+          _inAppPurchase.completePurchase(purchaseDetails);
+        }
+      }
+    }
   }
 
-  /// Start the subscription flow
   Future<void> startPayment({
     required String userId,
     required String email,
@@ -51,95 +69,91 @@ class PaymentViewModel extends ChangeNotifier {
     String phone = '',
   }) async {
     _currentUserId = userId;
-    _currentUserEmail = email;
-    _currentUserName = name;
-    _currentUserPhone = phone;
     _errorMessage = '';
     _status = PaymentStatus.creatingOrder;
     notifyListeners();
 
+    final bool available = await _inAppPurchase.isAvailable();
+    if (!available) {
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Store is currently not available.';
+      notifyListeners();
+      return;
+    }
+
+    const Set<String> kIds = <String>{_productId};
+    final ProductDetailsResponse response = await _inAppPurchase.queryProductDetails(kIds);
+
+    if (response.notFoundIDs.isNotEmpty) {
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Product not found. Please ensure it is configured in the Play Console.';
+      notifyListeners();
+      return;
+    }
+
+    final ProductDetails productDetails = response.productDetails.first;
+    final PurchaseParam purchaseParam = PurchaseParam(productDetails: productDetails);
+
     try {
-      // Step 1: Create subscription on backend
-      debugPrint('[PaymentVM] Creating subscription for user: $userId');
-      final subData = await _paymentApiService.createSubscription(userId: userId);
-
-      _currentSubscriptionId = subData['subscription_id'] as String;
-      _currentKeyId = subData['key_id'] as String;
-
-      debugPrint('[PaymentVM] Subscription created: $_currentSubscriptionId');
-
-      // Step 2: Open Razorpay Checkout
       _status = PaymentStatus.processingPayment;
       notifyListeners();
-
-      final options = {
-        'key': _currentKeyId,
-        'subscription_id': _currentSubscriptionId,
-        'name': 'ReelIQ',
-        'description': 'ReelIQ Pro - Monthly Subscription',
-        'prefill': {
-          'email': email,
-          'contact': phone,
-          'name': name,
-        },
-        'theme': {
-          'color': '#FF4D8D',
-        },
-        'modal': {
-          'confirm_close': true,
-        },
-      };
-
-      debugPrint('[PaymentVM] Opening Razorpay checkout...');
-      _razorpay!.open(options);
+      await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e) {
-      debugPrint('[PaymentVM] Error creating subscription: $e');
       _status = PaymentStatus.failed;
-      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _errorMessage = 'Failed to start purchase: $e';
       notifyListeners();
     }
   }
 
-  /// Handle successful payment from Razorpay SDK
-  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
-    debugPrint('[PaymentVM] Payment success: ${response.paymentId}');
+  Future<void> restorePurchases(String userId) async {
+    _currentUserId = userId;
+    _status = PaymentStatus.processingPayment;
+    notifyListeners();
+    try {
+      await _inAppPurchase.restorePurchases();
+    } catch (e) {
+      _status = PaymentStatus.failed;
+      _errorMessage = 'Failed to restore purchases: $e';
+      notifyListeners();
+    }
+  }
+
+  Future<void> _handlePaymentSuccess(PurchaseDetails purchaseDetails) async {
+    debugPrint('[PaymentVM] Payment success: ${purchaseDetails.purchaseID}');
     _status = PaymentStatus.verifying;
     notifyListeners();
 
     try {
-      // Step 3: Verify signature on backend
+      // Verify signature on backend
       final verifyResult = await _paymentApiService.verifySubscription(
-        subscriptionId: _currentSubscriptionId,
-        paymentId: response.paymentId ?? '',
-        signature: response.signature ?? '',
+        purchaseToken: purchaseDetails.verificationData.serverVerificationData,
+        productId: purchaseDetails.productID,
         userId: _currentUserId,
       );
 
       if (verifyResult['verified'] == true) {
         debugPrint('[PaymentVM] Payment verified. Activating Pro...');
 
-        // Step 4: Save payment record to Firestore
         await _firestoreService.savePaymentRecord(
-          response.paymentId ?? '',
+          purchaseDetails.purchaseID ?? purchaseDetails.productID,
           {
             'userId': _currentUserId,
-            'paymentId': response.paymentId ?? '',
-            'subscriptionId': _currentSubscriptionId,
-            'signature': response.signature ?? '',
-            'planName': 'ReelIQ Pro',
-            'status': 'captured',
+            'paymentId': purchaseDetails.purchaseID,
+            'productId': purchaseDetails.productID,
+            'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
+            'planName': 'ReelIQ Pro Monthly',
+            'status': purchaseDetails.status == PurchaseStatus.restored ? 'restored' : 'captured',
             'createdAt': DateTime.now().toIso8601String(),
           },
         );
 
-        // Step 5: Update user Pro status
         await _firestoreService.activateProStatus(
           _currentUserId,
-          subscriptionId: _currentSubscriptionId,
-          planName: 'ReelIQ Pro',
+          subscriptionId: purchaseDetails.purchaseID ?? 'restored_sub',
+          planName: 'ReelIQ Pro Monthly',
         );
 
-        _successPaymentId = response.paymentId ?? '';
+        _successPaymentId = purchaseDetails.purchaseID ?? '';
         _status = PaymentStatus.success;
       } else {
         _status = PaymentStatus.failed;
@@ -153,21 +167,13 @@ class PaymentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Handle payment failure from Razorpay SDK
-  void _handlePaymentError(PaymentFailureResponse response) {
-    debugPrint('[PaymentVM] Payment failed: ${response.code} - ${response.message}');
+  void _handlePaymentError(IAPError error) {
+    debugPrint('[PaymentVM] Payment failed: ${error.code} - ${error.message}');
     _status = PaymentStatus.failed;
-    _errorMessage = response.message ?? 'Payment was cancelled or failed.';
+    _errorMessage = error.message;
     notifyListeners();
   }
 
-  /// Handle external wallet selection
-  void _handleExternalWallet(ExternalWalletResponse response) {
-    debugPrint('[PaymentVM] External wallet: ${response.walletName}');
-    // External wallet selected - Razorpay will handle the flow
-  }
-
-  /// Reset state for retry
   void reset() {
     _status = PaymentStatus.idle;
     _errorMessage = '';
@@ -175,7 +181,6 @@ class PaymentViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Check if user has an active Pro subscription
   Future<bool> checkProStatus(String userId) async {
     try {
       final user = await _firestoreService.getUser(userId);
@@ -188,7 +193,7 @@ class PaymentViewModel extends ChangeNotifier {
 
   @override
   void dispose() {
-    disposeRazorpay();
+    _subscription.cancel();
     super.dispose();
   }
 }
