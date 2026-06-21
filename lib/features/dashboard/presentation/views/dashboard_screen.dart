@@ -689,34 +689,70 @@ class _HeroCard extends StatelessWidget {
           // ── Metrics row ─────────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111111),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF1C1C1C), width: 0.5),
-              ),
-              child: Row(
-                children: [
-                  _MetricCell(
-                    label: 'Followers',
-                    value: formatFollowers(user.followersCount),
-                    color: AppTheme.primary,
+            child: Column(
+              children: [
+                // First row: Followers, Engagement, Niche
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF1C1C1C), width: 0.5),
                   ),
-                  _VDiv(),
-                  _MetricCell(
-                    label: 'Engagement',
-                    value: '${user.engagementRate.toStringAsFixed(1)}%',
-                    color: const Color(0xFF10B981),
+                  child: Row(
+                    children: [
+                      _MetricCell(
+                        label: 'Followers',
+                        value: formatFollowers(user.followersCount),
+                        color: AppTheme.primary,
+                      ),
+                      _VDiv(),
+                      _MetricCell(
+                        label: 'Engagement',
+                        value: '${user.engagementRate.toStringAsFixed(1)}%',
+                        color: const Color(0xFF10B981),
+                      ),
+                      _VDiv(),
+                      _MetricCell(
+                        label: 'Niche',
+                        value: user.niche.isNotEmpty ? user.niche : '—',
+                        color: AppTheme.accent,
+                      ),
+                    ],
                   ),
-                  _VDiv(),
-                  _MetricCell(
-                    label: 'Niche',
-                    value: user.niche.isNotEmpty ? user.niche : '—',
-                    color: AppTheme.accent,
+                ),
+                const SizedBox(height: 8),
+                // Second row: Posts, Reels, Following
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF1C1C1C), width: 0.5),
                   ),
-                ],
-              ),
+                  child: Row(
+                    children: [
+                      _MetricCell(
+                        label: 'Posts',
+                        value: formatFollowers(user.totalPosts),
+                        color: const Color(0xFF3B82F6),
+                      ),
+                      _VDiv(),
+                      _MetricCell(
+                        label: 'Reels',
+                        value: formatFollowers(user.totalReels),
+                        color: const Color(0xFF8B5CF6),
+                      ),
+                      _VDiv(),
+                      _MetricCell(
+                        label: 'Following',
+                        value: formatFollowers(user.followingCount),
+                        color: const Color(0xFFF59E0B),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
 
