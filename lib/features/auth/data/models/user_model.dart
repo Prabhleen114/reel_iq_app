@@ -13,6 +13,9 @@ class UserModel {
   final int followersCount;
   final double engagementRate;
   final String niche;
+  final int totalPosts;
+  final int totalReels;
+  final int followingCount;
   final String audiencePersona;
   final DateTime? lastOpenedDate;
   final bool onboardingCompleted;
@@ -42,6 +45,9 @@ class UserModel {
     this.followersCount = 0,
     this.engagementRate = 0.0,
     this.niche = '',
+    this.totalPosts = 0,
+    this.totalReels = 0,
+    this.followingCount = 0,
     this.audiencePersona = '',
     this.lastOpenedDate,
     this.onboardingCompleted = false,
@@ -71,28 +77,21 @@ class UserModel {
       followersCount: map['followersCount'] ?? 0,
       engagementRate: (map['engagementRate'] ?? 0.0).toDouble(),
       niche: map['niche'] ?? '',
+      totalPosts: map['totalPosts'] ?? 0,
+      totalReels: map['totalReels'] ?? 0,
+      followingCount: map['followingCount'] ?? 0,
       audiencePersona: map['audiencePersona'] ?? '',
-      lastOpenedDate: map['lastOpenedDate'] != null
-          ? DateTime.tryParse(map['lastOpenedDate'] as String)
-          : null,
+      lastOpenedDate: map['lastOpenedDate'] != null ? DateTime.tryParse(map['lastOpenedDate'] as String) : null,
       onboardingCompleted: map['onboardingCompleted'] ?? false,
       interests: List<String>.from(map['interests'] ?? []),
       cameraConfidence: map['cameraConfidence'] ?? '',
-      planExpiry: map['planExpiry'] != null
-          ? DateTime.tryParse(map['planExpiry'] as String)
-          : null,
-      proActivatedAt: map['proActivatedAt'] != null
-          ? DateTime.tryParse(map['proActivatedAt'] as String)
-          : null,
+      planExpiry: map['planExpiry'] != null ? DateTime.tryParse(map['planExpiry'] as String) : null,
+      proActivatedAt: map['proActivatedAt'] != null ? DateTime.tryParse(map['proActivatedAt'] as String) : null,
       planName: map['planName'] ?? '',
       subscriptionId: map['subscriptionId'] ?? '',
       subscriptionStatus: map['subscriptionStatus'] ?? '',
-      nextBillingDate: map['nextBillingDate'] != null
-          ? DateTime.tryParse(map['nextBillingDate'] as String)
-          : null,
-      createdAt: map['createdAt'] != null
-          ? DateTime.tryParse(map['createdAt'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      nextBillingDate: map['nextBillingDate'] != null ? DateTime.tryParse(map['nextBillingDate'] as String) : null,
+      createdAt: map['createdAt'] != null ? DateTime.tryParse(map['createdAt'] as String) ?? DateTime.now() : DateTime.now(),
       completedQuests: List<String>.from(map['completedQuests'] ?? []),
     );
   }
@@ -111,6 +110,9 @@ class UserModel {
       'followersCount': followersCount,
       'engagementRate': engagementRate,
       'niche': niche,
+      'totalPosts': totalPosts,
+      'totalReels': totalReels,
+      'followingCount': followingCount,
       'audiencePersona': audiencePersona,
       'lastOpenedDate': lastOpenedDate?.toIso8601String(),
       'onboardingCompleted': onboardingCompleted,
@@ -140,6 +142,9 @@ class UserModel {
     int? followersCount,
     double? engagementRate,
     String? niche,
+    int? totalPosts,
+    int? totalReels,
+    int? followingCount,
     String? audiencePersona,
     DateTime? lastOpenedDate,
     bool? onboardingCompleted,
@@ -151,6 +156,7 @@ class UserModel {
     String? subscriptionId,
     String? subscriptionStatus,
     DateTime? nextBillingDate,
+    DateTime? createdAt,
     List<String>? completedQuests,
   }) {
     return UserModel(
@@ -166,6 +172,9 @@ class UserModel {
       followersCount: followersCount ?? this.followersCount,
       engagementRate: engagementRate ?? this.engagementRate,
       niche: niche ?? this.niche,
+      totalPosts: totalPosts ?? this.totalPosts,
+      totalReels: totalReels ?? this.totalReels,
+      followingCount: followingCount ?? this.followingCount,
       audiencePersona: audiencePersona ?? this.audiencePersona,
       lastOpenedDate: lastOpenedDate ?? this.lastOpenedDate,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
@@ -177,7 +186,7 @@ class UserModel {
       subscriptionId: subscriptionId ?? this.subscriptionId,
       subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
       nextBillingDate: nextBillingDate ?? this.nextBillingDate,
-      createdAt: createdAt,
+      createdAt: createdAt ?? this.createdAt,
       completedQuests: completedQuests ?? this.completedQuests,
     );
   }
