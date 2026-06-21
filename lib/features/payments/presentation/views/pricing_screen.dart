@@ -14,19 +14,7 @@ class PricingScreen extends StatefulWidget {
 }
 
 class _PricingScreenState extends State<PricingScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<PaymentViewModel>(context, listen: false).initRazorpay();
-    });
-  }
 
-  @override
-  void dispose() {
-    Provider.of<PaymentViewModel>(context, listen: false).disposeRazorpay();
-    super.dispose();
-  }
 
   void _upgradeToPro() {
     final authVM = Provider.of<AuthViewModel>(context, listen: false);
