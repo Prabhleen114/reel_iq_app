@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -21,9 +21,12 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
   final _nicheController = TextEditingController();
   final _audienceController = TextEditingController();
   final _goalController = TextEditingController();
-  
+  final _uniquePerspectiveController = TextEditingController();
+  final _knownForController = TextEditingController();
+  final _targetsController = TextEditingController();  
   String _postingFrequency = '3 Reels per week';
-  ContentCalendarDay? _selectedDay;
+  String _primaryGoal = 'Followers';
+  String _contentStyle = 'Educational';  ContentCalendarDay? _selectedDay;
 
   final List<String> _frequencies = [
     'Daily Reels',
@@ -31,13 +34,16 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
     '3 Reels per week',
     '2 Reels per week',
   ];
-
+  final List<String> _goals = ['Followers', 'Leads', 'Sales', 'Personal Brand', 'Community'];
+  final List<String> _styles = ['Educational', 'Storytelling', 'Authority', 'Entertainment', 'Personal Journey'];
   @override
   void dispose() {
     _nicheController.dispose();
     _audienceController.dispose();
     _goalController.dispose();
-    super.dispose();
+    _uniquePerspectiveController.dispose();
+    _knownForController.dispose();
+    _targetsController.dispose();    super.dispose();
   }
 
   void _generateCalendar() async {
@@ -53,7 +59,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
             backgroundColor: AppTheme.cardBackground,
             title: const Text('Pro Generation Limit'),
             content: const Text(
-              'Free Plan is limited to 2 saved Content Calendars. Upgrade to Pro for ₹199/month to generate unlimited content plans.',
+              'Free Plan is limited to 2 saved Content Calendars. Upgrade to Pro for â‚¹199/month to generate unlimited content plans.',
               style: TextStyle(color: AppTheme.textSecondary),
             ),
             actions: [
@@ -67,7 +73,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
                   Navigator.pop(context, true);
                 },
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.accent),
-                child: const Text('Get Pro (₹199)', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Get Pro (â‚¹199)', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -78,7 +84,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
       final calendar = await plannerVM.generateNewCalendar(
         niche: _nicheController.text,
         audience: _audienceController.text,
-        goal: _goalController.text,
+        goal: '${_goalController.text}\nPrimary goal: $_primaryGoal\nContent style: $_contentStyle\nUnique perspective: ${_uniquePerspectiveController.text}\nKnown-for topics: ${_knownForController.text}\nMonthly targets: ${_targetsController.text}',
         frequency: _postingFrequency,
       );
 
@@ -93,7 +99,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
   }
 
   void _copyToClipboard(ContentCalendarDay day) {
-    final text = 'Day ${day.day}: ${day.title}\n\n💡 IDEA:\n${day.idea}\n\n🪝 SUGGESTED HOOK:\n${day.hook}\n\n✍️ CAPTION:\n${day.caption}\n\n📣 CTA:\n${day.cta}\n\n⏰ POSTING TIME: ${day.postingTime} (${day.difficulty})';
+    final text = 'Day ${day.day}: ${day.title}\n\nðŸ’¡ IDEA:\n${day.idea}\n\nðŸª SUGGESTED HOOK:\n${day.hook}\n\nâœï¸ CAPTION:\n${day.caption}\n\nðŸ“£ CTA:\n${day.cta}\n\nâ° POSTING TIME: ${day.postingTime} (${day.difficulty})';
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -181,7 +187,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const Text(
-            'Create 30-Day Content Strategy',
+            'Creator Strategy Setup',
             style: TextStyle(
               color: AppTheme.textPrimary,
               fontSize: 22,
@@ -190,7 +196,7 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Input your parameters and our creator copilot will construct a complete calendar with specific hooks, captions, and CTAs.',
+            'Answer the strategy questions once. CreatorOS will turn your voice, positioning, audience, and goals into a monthly content system.',
             style: TextStyle(color: AppTheme.textSecondary, fontSize: 13, height: 1.45),
           ),
           const SizedBox(height: 24),
@@ -231,6 +237,62 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
                     prefixIcon: Icon(Icons.flag_rounded, color: AppTheme.textSecondary),
                   ),
                   validator: (val) => val == null || val.trim().isEmpty ? 'Please enter your goal' : null,
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  value: _primaryGoal,
+                  dropdownColor: AppTheme.cardBackground,
+                  decoration: const InputDecoration(
+                    labelText: 'Primary Goal',
+                    prefixIcon: Icon(Icons.track_changes_rounded, color: AppTheme.textSecondary),
+                  ),
+                  items: _goals.map((goal) => DropdownMenuItem<String>(value: goal, child: Text(goal))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _primaryGoal = val);
+                  },
+                ),
+                const SizedBox(height: 20),
+                DropdownButtonFormField<String>(
+                  value: _contentStyle,
+                  dropdownColor: AppTheme.cardBackground,
+                  decoration: const InputDecoration(
+                    labelText: 'Preferred Content Style',
+                    prefixIcon: Icon(Icons.style_rounded, color: AppTheme.textSecondary),
+                  ),
+                  items: _styles.map((style) => DropdownMenuItem<String>(value: style, child: Text(style))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _contentStyle = val);
+                  },
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _uniquePerspectiveController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'What makes your perspective unique?',
+                    hintText: 'e.g. I teach finance through creator case studies',
+                    prefixIcon: Icon(Icons.auto_awesome_rounded, color: AppTheme.textSecondary),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _knownForController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Topics you want to become known for',
+                    hintText: 'e.g. hooks, content systems, monetization',
+                    prefixIcon: Icon(Icons.topic_rounded, color: AppTheme.textSecondary),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                TextFormField(
+                  controller: _targetsController,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Monthly Targets',
+                    hintText: 'e.g. +1,000 followers, 20 leads, 4 sales calls',
+                    prefixIcon: Icon(Icons.flag_circle_rounded, color: AppTheme.textSecondary),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 
@@ -575,3 +637,6 @@ class _ContentPlannerScreenState extends State<ContentPlannerScreen> {
     );
   }
 }
+
+
+
